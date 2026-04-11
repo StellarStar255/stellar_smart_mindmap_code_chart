@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Persistent data (auto-created at runtime)
+data/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

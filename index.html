@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码脑图编辑器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --sidebar-width: 250px;
+            --sidebar-min-width: 180px;
+            --sidebar-max-width: 420px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+
+        body.fullscreen-view-active {
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+
+        .header {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-radius: 10px 10px 0 0;
+            position: relative;
+            z-index: 1001;
+            flex-wrap: wrap;
+        }
+
+        .header h1 {
+            font-size: 15px;
+            font-weight: 700;
+            white-space: nowrap;
+            margin-right: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            flex-wrap: wrap;
+        }
+
+        .controls .btn-group {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 3px;
+        }
+
+        .controls .btn-separator {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 2px;
+        }
+
+        .controls .header-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 4px 8px;
+            transition: background 0.2s;
+        }
+
+        .controls .header-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .controls .header-toggle input[type="checkbox"] {
+            cursor: pointer;
+            margin: 0;
+        }
+
+        button {
+            padding: 5px 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            color: #667eea;
+            transition: all 0.2s;
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+
+        .header button {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+
+        .header button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: none;
+        }
+
+        .header button:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        button:hover {
+            background: #f0f0f0;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-min-width);
+            max-width: var(--sidebar-max-width);
+            background: #f8f9fa;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .sidebar-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .input-group input,
+        .input-group textarea {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: inherit;
+        }
+
+        .input-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .sidebar-button {
+            width: 100%;
+            padding: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-button:hover {
+            background: #5568d3;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(0deg, #f8f9fa 1px, transparent 1px),
+                        linear-gradient(90deg, #f8f9fa 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+            background: white;
+        }
+
+        .node {
+            position: absolute;
+            padding: 10px 15px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: move;
+            min-width: 80px;
+            font-size: 13px;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            z-index: 100;
+            word-wrap: break-word;
+            max-width: 150px;
+        }
+
+        .node:hover {
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            border-color: #764ba2;
+        }
+
+        .node.selected {
+            border-color: #ff6b6b;
+            background: #ffe0e0;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2);
+        }
+
+        .node-delete {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            font-size: 12px;
+            font-weight: bold;
+            line-height: 20px;
+        }
+
+        .node.selected .node-delete {
+            display: block;
+        }
+
+        .node-delete:hover {
+            background: #ff5252;
+        }
+
+        .status-bar {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            border-radius: 0 0 10px 10px;
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .coordinates {
+            color: #999;
+        }
+
+        .shortcuts {
+            color: #999;
+        }
+
+        .modal {
+            display: none !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10001;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex !important;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .modal-buttons .cancel {
+            background: #ddd;
+            color: #333;
+        }
+
+        .modal-buttons .confirm {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-switch {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .modal-switch select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .modal-switch button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        /* 加密空间未解锁时的遮罩 */
+        #encryptedOverlay {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            pointer-events: auto;
+        }
+
+        body.encrypted-locked .shortcut-bar,
+        body.encrypted-locked .shortcut-manage-panel,
+        body.encrypted-locked .context-menu,
+        body.encrypted-locked .image-context-menu {
+            display: none !important;
+        }
+
+        .modal-content.large {
+            max-width: 800px;
+        }
+
+        /* 快捷方式栏 */
+        .shortcut-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.92);
+            color: #e2e8f0;
+            border-radius: 16px;
+            padding: 10px 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 12000;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            max-width: 90vw;
+            overflow: hidden;
+        }
+
+        .shortcut-bar .label {
+            font-size: 12px;
+            opacity: 0.7;
+            letter-spacing: 0.2px;
+            margin-right: 4px;
+        }
+
+        .shortcut-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 2px;
+            max-width: 65vw;
+        }
+
+        /* 竖向布局样式 */
+        .shortcut-bar.vertical {
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 250px;
+            max-height: 80vh;
+        }
+
+        .shortcut-bar.vertical .shortcut-pills {
+            flex-direction: column;
+            max-width: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            max-height: 60vh;
+            width: 100%;
+        }
+
+        .shortcut-bar.vertical .shortcut-pill {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .shortcut-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .shortcut-bar.vertical .shortcut-buttons {
+            width: 100%;
+            justify-content: space-between;
+            margin-left: 0;
+        }
+
+        .shortcut-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+
+        .shortcut-pill:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .shortcut-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .shortcut-remove {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 6px;
+        }
+
+        .shortcut-remove:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fca5a5;
+        }
+
+        .shortcut-manage-btn {
+            background: linear-gradient(135deg, #60a5fa, #818cf8);
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+        }
+
+        .shortcut-manage-btn:hover {
+            filter: brightness(1.05);
+        }
+
+        .shortcut-manage-panel {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.98);
+            color: #e2e8f0;
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+            z-index: 12000;
+            width: 360px;
+            max-width: 90vw;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            display: none;
+        }
+
+        .shortcut-manage-panel header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .shortcut-manage-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .shortcut-manage-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .shortcut-manage-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .shortcut-manage-actions button {
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .shortcut-manage-actions button.move {
+            background: rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+        }
+
+        .shortcut-manage-actions button.delete {
+            background: rgba(248, 113, 113, 0.2);
+            color: #fecdd3;
+        }
+
+        #fileManagerList {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .file-manager-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-manager-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-manager-item-name {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .file-manager-item-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-list {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .file-item {
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            font-size: 12px;
+            color: #667eea;
+        }
+
+        .file-item:hover {
+            background: #f5f5f5;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: #333;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 50;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .zoom-btn:hover {
+            background: #5568d3;
+        }
+
+        .container.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            max-height: none;
+            margin: 0;
+            padding: 0;
+            border-radius: 0;
+            z-index: 10000;
+        }
+
+        .container.fullscreen .header {
+            border-radius: 0;
+        }
+
+        .container.fullscreen .status-bar {
+            border-radius: 0;
+        }
+
+        .container.fullscreen .canvas-container {
+            background: white;
+        }
+
+        /* 主内容区基础样式 */
+        .main-content {
+            display: grid;
+            gap: 0;
+        }
+
+        .sidebar-resizer {
+            position: absolute;
+            top: 0;
+            right: -4px;
+            width: 8px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 200;
+            background: transparent;
+            touch-action: none;
+        }
+
+        .sidebar-resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background: #ddd;
+        }
+
+        .editor {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(0deg, #f8f9fa 1px, transparent 1px),
+                        linear-gradient(90deg, #f8f9fa 1px, transparent 1px);
+            background-size: 20px 20px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-name-display {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .canvas-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 双屏模式 - 显示左屏、侧边栏、右屏（真正的双屏） */
+        .main-content.dual {
+            grid-template-columns: 1fr var(--sidebar-width) 1fr;
+        }
+
+        /* 全屏左屏模式 - 显示侧边栏、右屏（单屏效果，控制板在左） */
+        .main-content.fullscreen-left {
+            grid-template-columns: var(--sidebar-width) 1fr;
+            grid-template-areas:
+                "sidebar right";
+        }
+
+        /* 单屏模式下隐藏左屏（第1个editor） */
+        .main-content.fullscreen-left > .editor:nth-child(1) {
+            display: none !important;
+        }
+
+        .main-content.fullscreen-left > .sidebar {
+            grid-area: sidebar;
+        }
+
+        .main-content.fullscreen-left > .editor:nth-child(3) {
+            grid-area: right;
+        }
+
+        /* 全屏显示模式 - 保持原有的布局(双屏/单屏) */
+        .main-content.fullscreen-view {
+            display: grid;
+            gap: 0;
+        }
+
+        /* 双屏模式下全屏显示 - 显示两个屏幕 + 中间侧边栏 */
+        .main-content.dual.fullscreen-view {
+            display: grid !important;
+            grid-template-columns: 1fr var(--sidebar-width) 1fr;
+        }
+
+        .main-content.dual.fullscreen-view > .editor {
+            display: flex !important;
+        }
+
+        .main-content.dual.fullscreen-view > .sidebar {
+            display: flex !important;
+            flex-direction: column;
+        }
+
+        /* 隐藏侧边栏模式 */
+        .main-content.sidebar-hidden .sidebar {
+            width: 2px !important;
+            min-width: 2px !important;
+            flex: 0 0 2px !important;
+            background: #999 !important;
+            border: none !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+
+        .main-content.sidebar-hidden .sidebar > * {
+            display: none !important;
+        }
+
+        /* 双屏模式下隐藏侧边栏 - 保持两个屏幕等宽 */
+        .main-content.dual.sidebar-hidden {
+            display: grid !important;
+            grid-template-columns: 1fr 2px 1fr !important;
+            gap: 0;
+        }
+
+        /* 单屏模式下隐藏侧边栏 */
+        .main-content.fullscreen-left.sidebar-hidden {
+            display: grid !important;
+            grid-template-columns: 2px 1fr !important;
+            gap: 0;
+        }
+
+        /* 双屏全屏显示时隐藏侧边栏 */
+        .main-content.dual.fullscreen-view.sidebar-hidden {
+            display: grid !important;
+            grid-template-columns: 1fr 2px 1fr !important;
+        }
+
+        /* 单屏全屏显示时隐藏侧边栏 */
+        .main-content.fullscreen-left.fullscreen-view.sidebar-hidden {
+            display: grid !important;
+            grid-template-columns: 2px 1fr !important;
+        }
+
+        /* 单屏模式下全屏显示 - 显示右屏，隐藏侧边栏和左屏 */
+        .main-content.fullscreen-left.fullscreen-view {
+            display: grid !important;
+            grid-template-columns: var(--sidebar-width) 1fr;
+        }
+
+
+
+        .main-content.fullscreen-left.fullscreen-view > .editor:nth-child(1) {
+            display: none !important;
+            width: 0 !important;
+        }
+
+        .main-content.fullscreen-left.fullscreen-view > .editor:nth-child(3) {
+            display: grid !important;
+            width: 100%;
+            height: 100%;
+        }
+
+        .container.fullscreen-view-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            max-height: none;
+            margin: 0;
+            padding: 0;
+            border-radius: 0;
+            z-index: 10000;
+            display: flex !important;
+            flex-direction: column !important;
+            box-shadow: none;
+        }
+
+        .container.fullscreen-view-mode .header {
+            border-radius: 0;
+            flex-shrink: 0 !important;
+            padding: 20px;
+            height: auto;
+            min-height: 60px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            flex-basis: auto;
+        }
+
+        .container.fullscreen-view-mode .main-content {
+            flex: 1 1 auto !important;
+            overflow: hidden;
+            border-radius: 0;
+            min-height: 0 !important;
+            max-height: calc(100% - 110px) !important;
+            display: grid !important;
+        }
+
+        .container.fullscreen-view-mode .status-bar {
+            border-radius: 0;
+            flex-shrink: 0 !important;
+            flex-grow: 0 !important;
+            padding: 15px 20px !important;
+            height: auto !important;
+            min-height: 50px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            flex-basis: auto !important;
+            background: #f8f9fa !important;
+            border-top: 1px solid #ddd !important;
+            position: relative !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        #fileListSidebar {
+            scrollbar-width: thin;
+            scrollbar-color: #ccc #f8f9fa;
+        }
+
+        #fileListSidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #fileListSidebar::-webkit-scrollbar-track {
+            background: #f8f9fa;
+        }
+
+        #fileListSidebar::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        #fileListSidebar::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        .file-list-item:last-child {
+            border-bottom: none !important;
+        }
+
+        #fileSearchInput:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        #fileSortSelect:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #fileSortOrderBtn:hover {
+            background: #f0f0f0;
+        }
+
+        #fileSortOrderBtn:active {
+            background: #e0e0e0;
+        }
+
+        #fileManagerSearchInput:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        #fileManagerSortSelect:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #fileManagerSortOrderBtn:hover {
+            background: #f0f0f0;
+        }
+
+        #fileManagerSortOrderBtn:active {
+            background: #e0e0e0;
+        }
+
+        .main-content.sidebar-hidden .sidebar-resizer {
+            display: none !important;
+        }
+
+        body.resizing-sidebar {
+            cursor: col-resize !important;
+            user-select: none;
+        }
+
+        /* Night Mode Styles */
+        body.night-mode {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        body.night-mode .container {
+            background: #0f0f23;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        body.night-mode .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        body.night-mode .sidebar {
+            background: #1a1a2e;
+            border-right: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .sidebar-title {
+            color: #e0e0e0;
+        }
+
+        body.night-mode .input-group label {
+            color: #aaa;
+        }
+
+        body.night-mode .input-group input,
+        body.night-mode .input-group textarea,
+        body.night-mode .input-group select {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .sidebar-button {
+            background: #4a5568;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .sidebar-button:hover {
+            background: #5a6678;
+        }
+
+        body.night-mode .canvas-container {
+            background: #000000;
+            background-image: linear-gradient(0deg, #1a1a2e 1px, transparent 1px),
+                              linear-gradient(90deg, #1a1a2e 1px, transparent 1px);
+        }
+
+        body.night-mode canvas {
+            background: #000000 !important;
+        }
+
+        body.night-mode .canvas-container {
+            background: #000000 !important;
+            background-image: linear-gradient(0deg, #2a2a3e 1px, transparent 1px),
+                              linear-gradient(90deg, #2a2a3e 1px, transparent 1px) !important;
+        }
+
+        body.night-mode .editor {
+            background: #000000 !important;
+            background-image: linear-gradient(0deg, #2a2a3e 1px, transparent 1px),
+                              linear-gradient(90deg, #2a2a3e 1px, transparent 1px) !important;
+        }
+
+        body.night-mode .node {
+            filter: invert(1);
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.5);
+        }
+
+        body.night-mode .node:hover {
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.6);
+        }
+
+        body.night-mode .node.selected {
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.4);
+        }
+
+        body.night-mode .status-bar {
+            background: #1a1a2e;
+            border-top: 1px solid #333;
+            color: #aaa;
+        }
+
+        body.night-mode .coordinates,
+        body.night-mode .shortcuts {
+            color: #888;
+        }
+
+        body.night-mode .file-name-display {
+            background: #0f0f23;
+            border-bottom: 1px solid #333;
+            color: #aaa;
+        }
+
+        body.night-mode .modal {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        body.night-mode .modal-content {
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .modal-content h2 {
+            color: #e0e0e0;
+        }
+
+        body.night-mode .modal-content input {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .modal-buttons .cancel {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .modal-buttons .confirm {
+            background: #4a5568;
+            color: #e0e0e0;
+        }
+
+        body.night-mode #fileListSidebar,
+        body.night-mode .file-list {
+            background: #0f0f23;
+            border: 1px solid #333;
+        }
+
+        body.night-mode .file-item {
+            color: #4a9eff;
+            border-bottom: 1px solid #333;
+        }
+
+        body.night-mode .file-item:hover {
+            background: #1a1a2e;
+        }
+
+        body.night-mode .file-manager-item {
+            border-bottom: 1px solid #333;
+        }
+
+        body.night-mode .file-manager-item-name {
+            color: #e0e0e0;
+        }
+
+        body.night-mode #fileManagerList {
+            border: 1px solid #333;
+        }
+
+        body.night-mode .zoom-btn {
+            background: #4a5568;
+            color: #e0e0e0;
+        }
+
+        body.night-mode .zoom-btn:hover {
+            background: #5a6678;
+        }
+
+        body.night-mode button {
+            background: #4a5568;
+            color: #e0e0e0;
+        }
+
+        body.night-mode button:hover {
+            background: #5a6678;
+        }
+
+        body.night-mode .header button {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        body.night-mode .header button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        body.night-mode .controls .btn-group {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        body.night-mode .controls .header-toggle {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        body.night-mode .controls .header-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        body.night-mode .color-option.selected {
+            border-color: #4a9eff;
+        }
+
+        body.night-mode #fileSearchInput,
+        body.night-mode #fileSortSelect,
+        body.night-mode #fileSortOrderBtn,
+        body.night-mode #fileManagerSearchInput,
+        body.night-mode #fileManagerSortSelect,
+        body.night-mode #fileManagerSortOrderBtn {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode #toggleNamespaceManage {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #aaa;
+        }
+
+        body.night-mode #nodeTextAlign,
+        body.night-mode #editTextAlign {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode #nodeProperties {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #e0e0e0;
+        }
+
+        body.night-mode #togglePropertiesBtn {
+            background: #0f0f23;
+            border: 1px solid #333;
+            color: #aaa;
+        }
+
+        #nodeEditText {
+            position: absolute;
+            background: white;
+            border: 2px dashed #ff6b6b;
+            padding: 5px;
+            font-family: sans-serif;
+            overflow-y: auto;
+            z-index: 500;
+        }
+
+        /* Minimap Styles */
+        .minimap {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            cursor: pointer;
+        }
+
+        .minimap.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .minimap canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+        }
+
+        body.night-mode .minimap {
+            background: rgba(26, 26, 46, 0.95);
+            border-color: #4a5568;
+        }
+
+        /* 搜索框样式 */
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        #nodeSearchInput {
+            width: 160px;
+            padding: 5px 12px 5px 30px;
+            font-size: 12px;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        #nodeSearchInput::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        #nodeSearchInput:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        #nodeSearchInput:focus {
+            width: 220px;
+            background: rgba(255, 255, 255, 0.95);
+            border-color: #667eea;
+            color: #333;
+            box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        #nodeSearchInput:focus::placeholder {
+            color: #999;
+        }
+
+        .search-container::before {
+            content: '🔍';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            z-index: 1;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-container:focus-within::before {
+            filter: grayscale(0);
+        }
+
+        .search-results {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 12px 18px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            color: #333;
+            transition: background 0.15s;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        /* 夜间模式搜索框 */
+        body.night-mode #nodeSearchInput {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #e0e0e0;
+        }
+
+        body.night-mode #nodeSearchInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        body.night-mode #nodeSearchInput:hover {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        body.night-mode #nodeSearchInput:focus {
+            background: rgba(26, 26, 46, 0.95);
+            border-color: #4a9eff;
+            color: #e0e0e0;
+            box-shadow: 0 4px 20px rgba(74, 158, 255, 0.3);
+        }
+
+        body.night-mode #nodeSearchInput:focus::placeholder {
+            color: #666;
+        }
+
+        body.night-mode .search-results {
+            background: #1a1a2e;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        body.night-mode .search-result-item {
+            color: #e0e0e0;
+            border-bottom-color: #333;
+        }
+
+        body.night-mode .search-result-item:hover {
+            background: rgba(74, 158, 255, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载指示器 -->
+    <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="font-size: 48px; margin-bottom: 20px;">💡</div>
+        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">代码脑图编辑器</div>
+        <div style="font-size: 14px; opacity: 0.8;">正在加载数据...</div>
+        <div style="margin-top: 20px; width: 200px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;">
+            <div style="width: 30%; height: 100%; background: white; border-radius: 2px; animation: loading 1.5s ease-in-out infinite;"></div>
+        </div>
+        <style>
+            @keyframes loading {
+                0% { width: 0%; margin-left: 0%; }
+                50% { width: 70%; margin-left: 15%; }
+                100% { width: 0%; margin-left: 100%; }
+            }
+        </style>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>💡 脑图编辑器</h1>
+            <div class="controls">
+                <div class="search-container">
+                    <input type="search" id="nodeSearchInput" placeholder="搜索节点...">
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+
+                <div class="btn-group">
+                    <button id="newBtn">📄 新建</button>
+                    <button id="saveBtn">💾 保存</button>
+                    <button id="saveAsBtn">📋 另存为</button>
+                    <button id="renameBtn">✏️ 重命名</button>
+                    <button id="loadBtn">📂 加载</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="exportImageBtn">🖼 导出图片</button>
+                    <button id="exportJsonBtn">📦 导出文件</button>
+                    <button id="exportEditableHtmlBtn">🌐 导出HTML</button>
+                    <button id="loadHtmlBtn">📥 导入HTML</button>
+                </div>
+
+                <div class="btn-group">
+                    <button id="fitViewBtn">🔲 适配窗口</button>
+                    <button id="fullscreenBtn">⛶ 全屏</button>
+                    <button id="fullscreenViewBtn">🖥 演示</button>
+                    <button id="toggleSidebarBtn">☰ 工具栏</button>
+                </div>
+
+                <label class="header-toggle">
+                    <input type="checkbox" id="lockCanvasCheckbox">
+                    🔒 锁定
+                </label>
+                <label class="header-toggle">
+                    <input type="checkbox" id="nightModeCheckbox">
+                    🌙 夜间
+                </label>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- 左屏编辑区 -->
+            <div class="editor" id="leftEditor">
+                <div class="file-name-display" id="fileNameLeft">未保存</div>
+                <div class="canvas-container" id="canvasContainerLeft">
+                    <canvas id="canvasLeft"></canvas>
+                    <div class="zoom-controls" id="zoomControlsLeft">
+                        <button class="zoom-btn" id="zoomInLeft">+</button>
+                        <button class="zoom-btn" id="zoomOutLeft">−</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间共享侧边栏 -->
+            <div class="sidebar">
+                <div class="sidebar-section" id="namespaceSection" style="display: block;">
+                    <div class="sidebar-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>📁 命名空间</span>
+                        <button id="toggleNamespaceManage" style="background: none; border: 1px solid #ddd; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #666;">
+                            <span id="toggleNamespaceIcon">▼</span> 管理
+                        </button>
+                    </div>
+                    <div class="input-group">
+                        <select id="namespaceSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="default">默认空间</option>
+                        </select>
+                    </div>
+                    <div id="namespaceManageButtons" style="display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+                        <div style="display: flex; gap: 8px;">
+                            <button class="sidebar-button" id="newNamespaceBtn" style="background: #4caf50; flex: 1;">新建空间</button>
+                            <button class="sidebar-button" id="deleteNamespaceBtn" style="background: #ff6b6b; flex: 1;">删除空间</button>
+                        </div>
+                        <button class="sidebar-button" id="encryptNamespaceBtn" style="background: #f0ad4e; flex: 1;">加密空间</button>
+                        <button class="sidebar-button" id="decryptNamespaceBtn" style="background: #dc3545; flex: 1; display: none;">解除加密</button>
+                        <button class="sidebar-button" id="lockNamespaceBtn" style="background: #6c757d; flex: 1; display: none;">锁定空间</button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section" id="editSelectedNodeSection">
+                    <div class="sidebar-title" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="addNodeSectionTitle">
+                        <span>📝 添加节点</span>
+                        <span id="addNodeToggleIcon">▼</span>
+                    </div>
+                    <div id="addNodeContent">
+                    <!-- 节点预设管理 -->
+                    <div class="input-group" style="border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 12px;">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span>⚡ 节点预设</span>
+                            <button id="toggleNodePresetManage" style="background: none; border: 1px solid #ddd; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #666;">
+                                <span id="nodePresetManageIcon">▼</span>
+                            </button>
+                        </label>
+                        <select id="nodePresetSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%; margin-bottom: 8px;">
+                            <option value="default">默认预设</option>
+                        </select>
+                        <div id="nodePresetManageButtons" style="display: none; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; gap: 6px;">
+                                <button class="sidebar-button" id="createNodePresetBtn" style="background: #9c27b0; flex: 1; padding: 6px; font-size: 11px;">✨ 新建</button>
+                                <button class="sidebar-button" id="saveNodePresetBtn" style="background: #4caf50; flex: 1; padding: 6px; font-size: 11px;">💾 保存</button>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="sidebar-button" id="renameNodePresetBtn" style="background: #2196f3; flex: 1; padding: 6px; font-size: 11px;">✏️ 重命名</button>
+                                <button class="sidebar-button" id="deleteNodePresetBtn" style="background: #ff6b6b; flex: 1; padding: 6px; font-size: 11px;">🗑️ 删除</button>
+                            </div>
+                            <div style="border-top: 1px solid #ddd; padding-top: 6px; margin-top: 2px;">
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="sidebar-button" id="exportPresetsBtn" style="background: #ff9800; flex: 1; padding: 6px; font-size: 11px;">📤 导出配置</button>
+                                    <button class="sidebar-button" id="importPresetsBtn" style="background: #00bcd4; flex: 1; padding: 6px; font-size: 11px;">📥 导入配置</button>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="file" id="importPresetsFile" accept=".json" style="display: none;">
+                    </div>
+
+                    <div class="input-group">
+                        <label>节点文本</label>
+                        <textarea id="nodeText" placeholder="输入节点内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>节点颜色</label>
+                        <div class="color-picker" id="nodeColorPicker">
+                            <div class="color-option selected" style="background: #e8f0fe;" data-color="#e8f0fe"></div>
+                            <div class="color-option" style="background: #fff3e0;" data-color="#fff3e0"></div>
+                            <div class="color-option" style="background: #e8f5e9;" data-color="#e8f5e9"></div>
+                            <div class="color-option" style="background: #fce4ec;" data-color="#fce4ec"></div>
+                            <div class="color-option" style="background: #f3e5f5;" data-color="#f3e5f5"></div>
+                            <div class="color-option" style="background: #111111;" data-color="#111111"></div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>文字颜色</label>
+                        <div class="color-picker" id="textColorPicker">
+                            <div class="color-option selected" style="background: #1f2937;" data-color="#1f2937"></div>
+                            <div class="color-option" style="background: #111111;" data-color="#111111"></div>
+                            <div class="color-option" style="background: #ffffff; border: 1px solid #ddd;" data-color="#ffffff"></div>
+                            <div class="color-option" style="background: #ef4444;" data-color="#ef4444"></div>
+                            <div class="color-option" style="background: #2563eb;" data-color="#2563eb"></div>
+                            <div class="color-option" style="background: #16a34a;" data-color="#16a34a"></div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>字体大小</label>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="number" id="nodeFontSize" min="10" max="32" value="13" placeholder="字体大小" style="flex:1;">
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" id="nodeFontSizeDec" class="btn btn-outline" style="padding: 4px 8px;">-</button>
+                                <button type="button" id="nodeFontSizeInc" class="btn btn-outline" style="padding: 4px 8px;">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>文本对齐</label>
+                        <select id="nodeTextAlign" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="left">左对齐</option>
+                            <option value="center" selected>居中对齐</option>
+                            <option value="right">右对齐</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>节点形状</label>
+                        <select id="nodeShape" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="rounded-rect" selected>圆角矩形（默认）</option>
+                            <option value="circle">圆形</option>
+                            <option value="diamond">菱形</option>
+                            <option value="trapezoid">梯形</option>
+                            <option value="rect">正方形/矩形</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="proportionalFontSize" checked>
+                            <span>等比例改变字体</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="moveChildrenWithParent" checked>
+                            <span>拖拽时同时移动子节点</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="autoFitText" checked>
+                            <span>自动适应文本</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label>边距模式</label>
+                        <select id="paddingMode" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="narrow">窄边模式（紧凑）</option>
+                            <option value="wide">宽边模式（宽松）</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="quickDelete">
+                            <span>快速删除（不提示）</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label>默认节点宽度</label>
+                        <input type="number" id="defaultNodeWidth" min="50" max="500" value="100" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>默认节点高度</label>
+                        <input type="number" id="defaultNodeHeight" min="30" max="500" value="40" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <!-- 线条预设管理 -->
+                    <div class="input-group" style="border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; padding: 12px 0; margin: 12px 0;">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span>⚡ 线条预设</span>
+                            <button id="toggleConnectionPresetManage" style="background: none; border: 1px solid #ddd; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #666;">
+                                <span id="connectionPresetManageIcon">▼</span>
+                            </button>
+                        </label>
+                        <select id="connectionPresetSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%; margin-bottom: 8px;">
+                            <option value="default">默认预设</option>
+                        </select>
+                        <div id="connectionPresetManageButtons" style="display: none; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; gap: 6px;">
+                                <button class="sidebar-button" id="createConnectionPresetBtn" style="background: #9c27b0; flex: 1; padding: 6px; font-size: 11px;">✨ 新建</button>
+                                <button class="sidebar-button" id="saveConnectionPresetBtn" style="background: #4caf50; flex: 1; padding: 6px; font-size: 11px;">💾 保存</button>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="sidebar-button" id="renameConnectionPresetBtn" style="background: #2196f3; flex: 1; padding: 6px; font-size: 11px;">✏️ 重命名</button>
+                                <button class="sidebar-button" id="deleteConnectionPresetBtn" style="background: #ff6b6b; flex: 1; padding: 6px; font-size: 11px;">🗑️ 删除</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>默认连接线样式</label>
+                        <select id="defaultConnectionLineStyle" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="solid">实线</option>
+                            <option value="dashed">虚线</option>
+                            <option value="dotted">点线</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>默认连接线类型</label>
+                        <select id="defaultConnectionLineType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="curve">曲线</option>
+                            <option value="straight">直线</option>
+                            <option value="elbow">折线</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>默认连接线粗细</label>
+                        <input type="number" id="defaultConnectionLineWidth" min="1" max="50" value="2" placeholder="线条粗细">
+                    </div>
+                    <div class="input-group">
+                        <label>默认连接线颜色</label>
+                        <div class="color-picker" id="defaultConnectionColorPicker">
+                            <div class="color-option selected" style="background: #667eea;" data-color="#667eea"></div>
+                            <div class="color-option" style="background: #ff6b6b;" data-color="#ff6b6b"></div>
+                            <div class="color-option" style="background: #4caf50;" data-color="#4caf50"></div>
+                            <div class="color-option" style="background: #ff9800;" data-color="#ff9800"></div>
+                            <div class="color-option" style="background: #9c27b0;" data-color="#9c27b0"></div>
+                            <div class="color-option" style="background: #00bcd4;" data-color="#00bcd4"></div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="defaultConnectionIndependent">
+                            <span>默认子节点独立</span>
+                        </label>
+                    </div>
+                    <button class="sidebar-button" id="addNodeBtn">添加节点</button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section" id="editNodeSection">
+                    <div class="sidebar-title">🎯 编辑选中节点</div>
+                    <!-- 快速应用节点预设 -->
+                    <div class="input-group" style="background: #f0f9ff; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+                        <label style="font-size: 11px; color: #666; margin-bottom: 4px;">⚡ 快速应用预设</label>
+                        <select id="editNodePresetSelect" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; width: 100%; margin-bottom: 6px;" disabled>
+                            <option value="">-- 选择预设 --</option>
+                        </select>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="sidebar-button" id="editCreateNodePresetBtn" style="background: #9c27b0; flex: 1; padding: 4px; font-size: 10px;" disabled>✨ 新建</button>
+                            <button class="sidebar-button" id="editSaveNodePresetBtn" style="background: #4caf50; flex: 1; padding: 4px; font-size: 10px;" disabled>💾 保存</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>文本</label>
+                        <textarea id="editText" placeholder="无选中节点" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>字体大小</label>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="number" id="editFontSize" min="10" max="32" placeholder="字体大小" disabled style="flex:1;">
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" id="editFontSizeDec" class="btn btn-outline" style="padding: 4px 8px;" disabled>-</button>
+                                <button type="button" id="editFontSizeInc" class="btn btn-outline" style="padding: 4px 8px;" disabled>+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="editCodeMode" disabled>
+                            <span>Code mode</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label>代码语言</label>
+                        <select id="editCodeLanguage" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;" disabled>
+                            <option value="auto" selected>自动检测</option>
+                            <option value="javascript">JavaScript / TypeScript</option>
+                            <option value="python">Python</option>
+                            <option value="go">Go</option>
+                            <option value="java">Java</option>
+                            <option value="cpp">C / C++</option>
+                            <option value="json">JSON</option>
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="markdown">Markdown</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>文本对齐</label>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <select id="editTextAlign" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;" disabled>
+                                <option value="left">左对齐</option>
+                                <option value="center">居中对齐</option>
+                                <option value="right">右对齐</option>
+                            </select>
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" id="editAlignLeft" class="btn btn-outline" style="padding: 4px 8px;" disabled>←</button>
+                                <button type="button" id="editAlignCenter" class="btn btn-outline" style="padding: 4px 8px;" disabled>↔</button>
+                                <button type="button" id="editAlignRight" class="btn btn-outline" style="padding: 4px 8px;" disabled>→</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>节点形状</label>
+                        <select id="editNodeShape" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;" disabled>
+                            <option value="rounded-rect">圆角矩形（默认）</option>
+                            <option value="circle">圆形</option>
+                            <option value="diamond">菱形</option>
+                            <option value="trapezoid">梯形</option>
+                            <option value="rect">正方形/矩形</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>节点宽度</label>
+                        <input type="number" id="editNodeWidth" min="50" max="1000" placeholder="宽度" disabled style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>节点高度</label>
+                        <input type="number" id="editNodeHeight" min="30" max="1000" placeholder="高度" disabled style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>颜色</label>
+                        <div class="color-picker" id="editColorPicker">
+                            <div class="color-option" style="background: #e8f0fe;" data-color="#e8f0fe"></div>
+                            <div class="color-option" style="background: #fff3e0;" data-color="#fff3e0"></div>
+                            <div class="color-option" style="background: #e8f5e9;" data-color="#e8f5e9"></div>
+                            <div class="color-option" style="background: #fce4ec;" data-color="#fce4ec"></div>
+                            <div class="color-option" style="background: #f3e5f5;" data-color="#f3e5f5"></div>
+                            <div class="color-option" style="background: #111111;" data-color="#111111"></div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>文字颜色</label>
+                        <div class="color-picker" id="editTextColorPicker">
+                            <div class="color-option" style="background: #1f2937;" data-color="#1f2937"></div>
+                            <div class="color-option" style="background: #111111;" data-color="#111111"></div>
+                            <div class="color-option" style="background: #ffffff; border: 1px solid #ddd;" data-color="#ffffff"></div>
+                            <div class="color-option" style="background: #ef4444;" data-color="#ef4444"></div>
+                            <div class="color-option" style="background: #2563eb;" data-color="#2563eb"></div>
+                            <div class="color-option" style="background: #16a34a;" data-color="#16a34a"></div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="nodeLocked" style="cursor: pointer;">
+                            <span>🔒 锁定（不受自动调整影响）</span>
+                        </label>
+                    </div>
+                    <button class="sidebar-button" style="background: #ff6b6b;" id="deleteNodeBtn">删除节点</button>
+                </div>
+
+                <div class="sidebar-section" id="connectionPropertiesSection" style="display: none;">
+                    <div class="sidebar-title" id="connectionPropertiesTitle">🔗 编辑选中连接线</div>
+                    <!-- 快速应用线条预设 -->
+                    <div class="input-group" style="background: #fef3e7; padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+                        <label style="font-size: 11px; color: #666; margin-bottom: 4px;">⚡ 快速应用预设</label>
+                        <select id="editConnectionPresetSelect" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; width: 100%; margin-bottom: 6px;">
+                            <option value="">-- 选择预设 --</option>
+                        </select>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="sidebar-button" id="editCreateConnectionPresetBtn" style="background: #9c27b0; flex: 1; padding: 4px; font-size: 10px;">✨ 新建</button>
+                            <button class="sidebar-button" id="editSaveConnectionPresetBtn" style="background: #4caf50; flex: 1; padding: 4px; font-size: 10px;">💾 保存</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>连接线文字</label>
+                        <input type="text" id="connectionLabel" placeholder="在连接线上显示的文字..." style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>文字字体大小</label>
+                        <input type="number" id="connectionLabelFontSize" min="8" max="24" value="12" placeholder="文字大小" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                    </div>
+                    <div class="input-group">
+                        <label>线条样式</label>
+                        <select id="connectionLineStyle" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="solid">实线</option>
+                            <option value="dashed">虚线</option>
+                            <option value="dotted">点线</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>线条类型</label>
+                        <select id="connectionLineType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 100%;">
+                            <option value="curve">曲线</option>
+                            <option value="straight">直线</option>
+                            <option value="elbow">折线</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>线条粗细</label>
+                        <input type="number" id="connectionLineWidth" min="1" max="50" value="2" placeholder="线条粗细">
+                    </div>
+                    <div class="input-group">
+                        <label>箭头大小</label>
+                        <input type="number" id="connectionArrowSize" min="1" max="100" value="20" placeholder="箭头大小">
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="connectionIndependent" style="cursor: pointer;">
+                            <span>子节点独立（不随父节点移动/删除）</span>
+                        </label>
+                    </div>
+                    <div class="input-group">
+                        <label>线条颜色</label>
+                        <div class="color-picker" id="connectionColorPicker">
+                            <div class="color-option" style="background: #667eea;" data-color="#667eea"></div>
+                            <div class="color-option" style="background: #ff6b6b;" data-color="#ff6b6b"></div>
+                            <div class="color-option" style="background: #4caf50;" data-color="#4caf50"></div>
+                            <div class="color-option" style="background: #ff9800;" data-color="#ff9800"></div>
+                            <div class="color-option" style="background: #9c27b0;" data-color="#9c27b0"></div>
+                            <div class="color-option" style="background: #00bcd4;" data-color="#00bcd4"></div>
+                        </div>
+                    </div>
+                    <button class="sidebar-button" style="background: #ff6b6b;" id="deleteConnectionBtn">删除连接线</button>
+                </div>
+
+                <div class="sidebar-section" id="nodePropertiesSection" style="display: none;">
+                    <div class="sidebar-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>📋 节点属性</span>
+                        <button id="togglePropertiesBtn" style="background: none; border: 1px solid #ddd; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #666;">
+                            <span id="togglePropertiesIcon">▼</span> 展开
+                        </button>
+                    </div>
+                    <div id="propertiesContent" style="display: none;">
+                        <div class="input-group">
+                            <label>属性内容</label>
+                            <textarea id="nodeProperties" placeholder="在此输入节点属性（支持换行）..." style="min-height: 120px; resize: vertical; font-family: monospace; font-size: 12px;" disabled autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                        </div>
+                        <div style="font-size: 11px; color: #999; margin-top: 5px;">
+                            提示: 可以添加任意属性信息，支持多行
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-title">💾 文件管理</div>
+                    <div class="input-group">
+                        <input type="text" id="fileSearchInput" placeholder="搜索文件..." style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    <div style="display: flex; gap: 5px; margin-bottom: 8px; align-items: center;">
+                        <select id="fileSortSelect" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <option value="name">按名称</option>
+                            <option value="time" selected>按时间</option>
+                        </select>
+                        <button id="fileSortOrderBtn" style="padding: 6px 10px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;" title="切换排序方向">↓</button>
+                        <button id="fileListRefreshBtn" style="padding: 6px 8px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 11px;" title="刷新列表">刷新</button>
+                    </div>
+                    <!-- 加载状态指示器 -->
+                    <div id="fileListLoadingIndicator" style="display: none; padding: 10px; text-align: center; color: #ff9800; font-size: 12px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; margin-bottom: 10px;">
+                        ⏳ 正在初始化，请稍候...
+                    </div>
+                    <div id="fileListSidebar" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; background: white; margin-bottom: 10px;">
+                        <!-- 文件列表将在这里显示 -->
+                    </div>
+                    <button class="sidebar-button" id="fileManagerBtn">管理所有文件</button>
+                </div>
+                <div class="sidebar-resizer" id="sidebarResizer" title="拖动调整宽度"></div>
+            </div>
+
+            <!-- 右屏编辑区 -->
+            <div class="editor" id="rightEditor">
+                <div class="file-name-display" id="fileNameRight">未保存</div>
+                <div class="canvas-container" id="canvasContainerRight">
+                    <canvas id="canvasRight"></canvas>
+                    <div class="zoom-controls" id="zoomControlsRight">
+                        <button class="zoom-btn" id="zoomInRight">+</button>
+                        <button class="zoom-btn" id="zoomOutRight">−</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span class="coordinates">坐标: <span id="coordX">0</span>, <span id="coordY">0</span></span>
+            <span class="shortcuts">快捷键: Cmd/Ctrl+F = 搜索 | Cmd/Ctrl+S = 保存 | Cmd/Ctrl+C = 复制 | Cmd/Ctrl+X = 剪切 | Cmd/Ctrl+V = 粘贴 | 双击 = 编辑/新建 | Tab = 创建子节点 | Click = 选中 | 左键拖拽 = 框选 | Shift+Click = 直接连接 | Shift+拖拽 = 动态拉线 | Ctrl+Click = 新建 | Delete 或 Cmd/Ctrl+Backspace = 删除</span>
+        </div>
+    </div>
+
+    
+    <!-- 加密空间未解锁遮罩 -->
+    <div id="encryptedOverlay"></div>
+
+    <!-- 密码对话框 -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <h2 id="passwordModalTitle">请输入密码</h2>
+            <p id="passwordModalDesc" style="font-size: 13px; color: #666; margin-bottom: 15px;">这个空间是加密的，请输入密码访问。</p>
+            <input type="password" id="passwordInput" placeholder="输入密码...">
+            <div class="modal-switch">
+                <select id="passwordNamespaceSelect" aria-label="切换命名空间">
+                    <option value="default">默认空间</option>
+                </select>
+                <button type="button" id="passwordNamespaceSwitchBtn">切换空间</button>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="cancel" onclick="closePasswordModal(); return false;">取消</button>
+                <button type="button" class="confirm" onclick="confirmPassword(); return false;">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存对话框 -->
+    <div class="modal" id="saveModal">
+        <div class="modal-content">
+            <h2>另存为</h2>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">为文件命名后，编辑内容将自动保存</p>
+            <input type="text" id="saveFileName" placeholder="输入文件名...">
+            <div class="modal-buttons">
+                <button type="button" class="cancel" onclick="closeSaveModal(); return false;">取消</button>
+                <button type="button" class="confirm" onclick="confirmSave(); return false;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提取节点到新页面的命名对话框 -->
+    <div class="modal" id="extractToPageModal">
+        <div class="modal-content">
+            <h2>提取到新页面</h2>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">选中的节点将被移动到新页面，原位置将创建页面链接</p>
+            <input type="text" id="extractPageName" placeholder="输入新页面名称..." onkeydown="if(event.key==='Enter'){confirmExtractToPage();return false;}">
+            <div class="modal-buttons">
+                <button type="button" class="cancel" onclick="closeExtractToPageModal(); return false;">取消</button>
+                <button type="button" class="confirm" onclick="confirmExtractToPage(); return false;">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件上传输入框 -->
+    <input type="file" id="fileInput" accept=".json,.html,.htm" style="display: none;">
+
+    <!-- File Manager Modal -->
+    <div class="modal" id="fileManagerModal">
+        <div class="modal-content large">
+            <h2>文件管理</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                <input type="text" id="fileManagerSearchInput" placeholder="搜索文件..." style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                <select id="fileManagerSortSelect" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                    <option value="name">按名称</option>
+                    <option value="time" selected>按时间</option>
+                </select>
+                <button id="fileManagerSortOrderBtn" style="padding: 10px 15px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;" title="切换排序方向">↓</button>
+                <button id="fileManagerRefreshBtn" style="padding: 10px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 14px;" title="刷新列表">刷新</button>
+            </div>
+            <div id="fileManagerList">
+                <!-- File items will be injected here by JS -->
+            </div>
+            <div class="modal-buttons">
+                <label style="margin-right: auto; display: flex; align-items: center; gap: 2px; white-space: nowrap;">
+                    <input type="checkbox" id="quickDeleteCheckbox" style="margin: 0;">
+                    快速删除
+                </label>
+                <button type="button" class="cancel" onclick="closeFileManagerModal(); return false;">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 大图显示弹窗 -->
+    <div class="modal" id="imageViewerModal" onclick="if(event.target === this) closeImageViewer();">
+        <div class="image-viewer-content" id="imageViewerContent">
+            <div class="image-viewer-toolbar">
+                <button class="image-viewer-btn" onclick="zoomImage(-0.2)" title="缩小">−</button>
+                <span class="image-viewer-zoom-level" id="imageZoomLevel">100%</span>
+                <button class="image-viewer-btn" onclick="zoomImage(0.2)" title="放大">+</button>
+                <button class="image-viewer-btn" onclick="resetImageZoom()" title="重置">⟲</button>
+                <button class="image-viewer-close" onclick="closeImageViewer()">✕</button>
+            </div>
+            <div class="image-viewer-container" id="imageViewerContainer">
+                <img id="largeImageView" src="" alt="大图" draggable="false">
+            </div>
+            <div class="image-viewer-resize-handle"></div>
+        </div>
+    </div>
+
+    <style>
+        /* 图片右键菜单样式 */
+        .image-context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            z-index: 10002;
+            min-width: 120px;
+            overflow: hidden;
+        }
+
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+            transition: background 0.15s;
+        }
+
+        .context-menu-item:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .context-menu-item .shortcut {
+            float: right;
+            margin-left: 20px;
+            font-size: 11px;
+            opacity: 0.6;
+        }
+
+        /* 文本右键菜单样式 */
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            z-index: 10002;
+            min-width: 120px;
+            overflow: hidden;
+        }
+
+        /* 大图显示弹窗样式 */
+        .image-viewer-content {
+            position: relative;
+            width: 70vw;
+            height: 70vh;
+            min-width: 300px;
+            min-height: 200px;
+            max-width: 95vw;
+            max-height: 95vh;
+            background: rgba(20, 20, 30, 0.95);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        .image-viewer-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .image-viewer-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            color: white;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-viewer-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .image-viewer-zoom-level {
+            color: white;
+            font-size: 14px;
+            min-width: 50px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .image-viewer-close {
+            background: rgba(255, 100, 100, 0.8);
+            margin-left: auto;
+        }
+
+        .image-viewer-close:hover {
+            background: #ff6b6b;
+        }
+
+        .image-viewer-container {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            cursor: grab;
+            position: relative;
+        }
+
+        .image-viewer-container:active {
+            cursor: grabbing;
+        }
+
+        .image-viewer-container img {
+            max-width: none;
+            max-height: none;
+            width: auto;
+            height: auto;
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 4px;
+            user-select: none;
+            transform-origin: center center;
+            pointer-events: auto;
+        }
+
+        .image-viewer-resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.3) 50%);
+            border-radius: 0 0 12px 0;
+        }
+
+        .image-viewer-resize-handle:hover {
+            background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.5) 50%);
+        }
+
+        /* 夜间模式适配 */
+        body.night-mode .image-context-menu {
+            background: #1a1a2e;
+        }
+
+        body.night-mode .context-menu {
+            background: #1a1a2e;
+        }
+
+        body.night-mode .context-menu-item {
+            color: #e0e0e0;
+        }
+
+        body.night-mode .context-menu-item:hover {
+            background: #4a5568;
+        }
+
+        body.night-mode .image-viewer-content {
+            background: rgba(10, 10, 20, 0.98);
+        }
+
+        body.night-mode .image-viewer-toolbar {
+            background: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+
+    <!-- 更新通知 -->
+    <div id="updateNotification" style="
+        display: none;
+        position: fixed;
+        top: 100px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 1000;
+        cursor: pointer;
+        animation: slideIn 0.3s ease;
+        font-size: 14px;
+    ">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">🔄</span>
+            <div>
+                <div style="font-weight: bold;">有新内容</div>
+                <div style="font-size: 12px; opacity: 0.9;">点击刷新页面查看</div>
+            </div>
+            <button onclick="event.stopPropagation(); hideUpdateNotification();" style="
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 14px;
+                margin-left: 10px;
+            ">✕</button>
+        </div>
+    </div>
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+    <script>
+        function showUpdateNotification() {
+            const notification = document.getElementById('updateNotification');
+            notification.style.display = 'block';
+            notification.onclick = function() {
+                location.reload();
+            };
+        }
+        function hideUpdateNotification() {
+            document.getElementById('updateNotification').style.display = 'none';
+        }
+        // 监听服务器更新事件
+        window.addEventListener('serverStorageUpdate', function(e) {
+            if (e.detail && e.detail.key) {
+                showUpdateNotification();
+            }
+        });
+    </script>
+
+    <script>
+        // Night Mode Toggle
+        const nightModeCheckbox = document.getElementById('nightModeCheckbox');
+        const NIGHT_MODE_KEY = 'mindmap_night_mode';
+
+        // Load saved night mode preference
+        const savedNightMode = localStorage.getItem(NIGHT_MODE_KEY) === 'true';
+        if (savedNightMode) {
+            document.body.classList.add('night-mode');
+            nightModeCheckbox.checked = true;
+        }
+
+        // Toggle night mode
+        nightModeCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                document.body.classList.add('night-mode');
+                localStorage.setItem(NIGHT_MODE_KEY, 'true');
+            } else {
+                document.body.classList.remove('night-mode');
+                localStorage.setItem(NIGHT_MODE_KEY, 'false');
+            }
+
+            // Redraw canvas to update line colors
+            if (window.app) {
+                if (window.app.leftCanvas) {
+                    window.app.leftCanvas.draw();
+                }
+                if (window.app.rightCanvas) {
+                    window.app.rightCanvas.draw();
+                }
+            }
+        });
+
+        // 连接线属性编辑事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            const applyDefaultToApps = (apply) => {
+                if (AppState.appLeft) apply(AppState.appLeft);
+                if (AppState.appRight) apply(AppState.appRight);
+            };
+            const savedLineWidth = parseInt(localStorage.getItem('mindmap_default_line_width'), 10);
+            if (!isNaN(savedLineWidth)) {
+                document.getElementById('connectionLineWidth').value = savedLineWidth;
+            }
+            const defaultConnectionLineWidth = document.getElementById('defaultConnectionLineWidth');
+            if (defaultConnectionLineWidth && !isNaN(savedLineWidth)) {
+                defaultConnectionLineWidth.value = savedLineWidth;
+            }
+            const savedArrowSize = parseInt(localStorage.getItem('mindmap_default_arrow_size'), 10);
+            if (!isNaN(savedArrowSize)) {
+                document.getElementById('connectionArrowSize').value = savedArrowSize;
+            }
+            const savedLineStyle = localStorage.getItem('mindmap_default_line_style');
+            if (savedLineStyle) {
+                const defaultLineStyleSelect = document.getElementById('defaultConnectionLineStyle');
+                if (defaultLineStyleSelect) defaultLineStyleSelect.value = savedLineStyle;
+            }
+            const savedLineType = localStorage.getItem('mindmap_default_line_type');
+            if (savedLineType) {
+                const defaultLineTypeSelect = document.getElementById('defaultConnectionLineType');
+                if (defaultLineTypeSelect) defaultLineTypeSelect.value = savedLineType;
+            }
+            const savedLineColor = localStorage.getItem('mindmap_default_line_color');
+            if (savedLineColor) {
+                const defaultColorPicker = document.getElementById('defaultConnectionColorPicker');
+                if (defaultColorPicker) {
+                    defaultColorPicker.querySelectorAll('.color-option').forEach(option => {
+                        option.classList.toggle('selected', option.getAttribute('data-color') === savedLineColor);
+                    });
+                }
+            }
+            const savedLineIndependent = localStorage.getItem('mindmap_default_line_independent');
+            const defaultIndependentCheckbox = document.getElementById('defaultConnectionIndependent');
+            if (defaultIndependentCheckbox) {
+                defaultIndependentCheckbox.checked = savedLineIndependent === 'true';
+            }
+            const savedNodeFontSize = parseInt(localStorage.getItem('mindmap_default_font_size'), 10);
+            if (!isNaN(savedNodeFontSize)) {
+                document.getElementById('nodeFontSize').value = savedNodeFontSize;
+            }
+            const savedNodeAlign = localStorage.getItem('mindmap_default_node_align');
+            if (savedNodeAlign) {
+                document.getElementById('nodeTextAlign').value = savedNodeAlign;
+            }
+            const savedNodeShape = localStorage.getItem('mindmap_default_node_shape');
+            if (savedNodeShape) {
+                document.getElementById('nodeShape').value = savedNodeShape;
+            }
+            const savedNodeColor = localStorage.getItem('mindmap_default_node_color');
+            if (savedNodeColor) {
+                document.querySelectorAll('#nodeColorPicker .color-option').forEach(option => {
+                    option.classList.toggle('selected', option.getAttribute('data-color') === savedNodeColor);
+                });
+            }
+            const attachStepper = (inputId, incId, decId) => {
+                const input = document.getElementById(inputId);
+                const incBtn = document.getElementById(incId);
+                const decBtn = document.getElementById(decId);
+                if (!input || !incBtn || !decBtn) return;
+                const clamp = (val) => {
+                    const min = parseInt(input.min, 10);
+                    const max = parseInt(input.max, 10);
+                    const minVal = isNaN(min) ? -Infinity : min;
+                    const maxVal = isNaN(max) ? Infinity : max;
+                    return Math.max(minVal, Math.min(maxVal, val));
+                };
+                const stepChange = (delta) => {
+                    const current = parseInt(input.value, 10);
+                    const base = !isNaN(current) ? current : clamp(0);
+                    const next = clamp(base + delta);
+                    input.value = next;
+                    input.dispatchEvent(new Event('input'));
+                };
+                incBtn.addEventListener('click', () => stepChange(1));
+                decBtn.addEventListener('click', () => stepChange(-1));
+            };
+            attachStepper('nodeFontSize', 'nodeFontSizeInc', 'nodeFontSizeDec');
+            attachStepper('editFontSize', 'editFontSizeInc', 'editFontSizeDec');
+            if (defaultConnectionLineWidth) {
+                defaultConnectionLineWidth.addEventListener('input', function() {
+                    const raw = this.value;
+                    if (raw === '') return;
+                    const val = Math.max(1, Math.min(50, parseInt(raw, 10) || 1));
+                    this.value = val;
+                    localStorage.setItem('mindmap_default_line_width', val);
+                    applyDefaultToApps(app => { app.defaultLineWidth = val; });
+                });
+            }
+            const defaultLineStyleSelect = document.getElementById('defaultConnectionLineStyle');
+            if (defaultLineStyleSelect) {
+                defaultLineStyleSelect.addEventListener('change', function() {
+                    localStorage.setItem('mindmap_default_line_style', this.value);
+                    applyDefaultToApps(app => { app.defaultLineStyle = this.value; });
+                });
+            }
+            const defaultLineTypeSelect = document.getElementById('defaultConnectionLineType');
+            if (defaultLineTypeSelect) {
+                defaultLineTypeSelect.addEventListener('change', function() {
+                    localStorage.setItem('mindmap_default_line_type', this.value);
+                    applyDefaultToApps(app => { app.defaultLineType = this.value; });
+                });
+            }
+            const defaultColorPicker = document.getElementById('defaultConnectionColorPicker');
+            if (defaultColorPicker) {
+                defaultColorPicker.addEventListener('click', function(e) {
+                    if (!e.target.classList.contains('color-option')) return;
+                    const color = e.target.getAttribute('data-color');
+                    localStorage.setItem('mindmap_default_line_color', color);
+                    applyDefaultToApps(app => { app.defaultLineColor = color; });
+                    defaultColorPicker.querySelectorAll('.color-option').forEach(option => {
+                        option.classList.remove('selected');
+                    });
+                    e.target.classList.add('selected');
+                });
+            }
+            if (defaultIndependentCheckbox) {
+                defaultIndependentCheckbox.addEventListener('change', function() {
+                    localStorage.setItem('mindmap_default_line_independent', this.checked ? 'true' : 'false');
+                    applyDefaultToApps(app => { app.defaultLineIndependent = this.checked; });
+                });
+            }
+
+            // 连接线文字改变
+            document.getElementById('connectionLabel').addEventListener('input', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                if (activeApp && activeApp.selectedConnections.length > 0) {
+                    // 应用到所有选中的连接线
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.label = this.value;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 连接线文字字体大小改变
+            document.getElementById('connectionLabelFontSize').addEventListener('change', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                if (activeApp && activeApp.selectedConnections.length > 0) {
+                    // 应用到所有选中的连接线
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.labelFontSize = parseInt(this.value) || 12;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 线条样式改变
+            document.getElementById('connectionLineStyle').addEventListener('change', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                if (activeApp && activeApp.selectedConnections.length > 0) {
+                    // 应用到所有选中的连接线
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.lineStyle = this.value;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 线条类型改变
+            document.getElementById('connectionLineType').addEventListener('change', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                if (activeApp && activeApp.selectedConnections.length > 0) {
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.lineType = this.value;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 线条粗细改变（即时生效，并更新默认值）
+            document.getElementById('connectionLineWidth').addEventListener('input', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                const raw = this.value;
+                if (raw === '') return; // 允许用户清空再输入
+                const val = Math.max(1, Math.min(50, parseInt(raw, 10) || 1));
+                this.value = val;
+                if (!activeApp) return;
+                activeApp.defaultLineWidth = val;
+                localStorage.setItem('mindmap_default_line_width', val);
+                if (activeApp.selectedConnections.length > 0) {
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.lineWidth = val;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 箭头大小改变（即时生效，并更新默认值）
+            document.getElementById('connectionArrowSize').addEventListener('input', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                const raw = this.value;
+                if (raw === '') return; // 允许用户清空再输入
+                const val = Math.max(1, Math.min(100, parseInt(raw, 10) || 1));
+                this.value = val;
+                if (!activeApp) return;
+                activeApp.defaultArrowSize = val;
+                localStorage.setItem('mindmap_default_arrow_size', val);
+                if (activeApp.selectedConnections.length > 0) {
+                    activeApp.selectedConnections.forEach(conn => {
+                        conn.arrowSize = val;
+                    });
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            const connectionIndependent = document.getElementById('connectionIndependent');
+            if (connectionIndependent) {
+                connectionIndependent.addEventListener('change', function() {
+                    const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                    this.indeterminate = false;
+                    if (activeApp && activeApp.selectedConnections.length > 0) {
+                        activeApp.selectedConnections.forEach(conn => {
+                            conn.isIndependent = this.checked;
+                        });
+                        activeApp.saveToLocalStorage();
+                        activeApp.draw();
+                    }
+                });
+            }
+
+            // 连接线颜色选择
+            const connectionColorPicker = document.getElementById('connectionColorPicker');
+            if (connectionColorPicker) {
+                connectionColorPicker.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('color-option')) {
+                        const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                        if (activeApp && activeApp.selectedConnections.length > 0) {
+                            const color = e.target.getAttribute('data-color');
+                            // 应用到所有选中的连接线
+                            activeApp.selectedConnections.forEach(conn => {
+                                conn.color = color;
+                            });
+
+                            // 更新颜色选择器状态
+                            connectionColorPicker.querySelectorAll('.color-option').forEach(option => {
+                                option.classList.remove('selected');
+                            });
+                            e.target.classList.add('selected');
+
+                            activeApp.saveToLocalStorage();
+                            activeApp.draw();
+                        }
+                    }
+                });
+            }
+
+            // 删除连接线按钮
+            document.getElementById('deleteConnectionBtn').addEventListener('click', function() {
+                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
+                if (activeApp && activeApp.selectedConnections.length > 0) {
+                    const connection = activeApp.selectedConnections[0];
+                    activeApp.connections = activeApp.connections.filter(c => c !== connection);
+                    activeApp.selectConnection(null);
+                    activeApp.saveToLocalStorage();
+                    activeApp.draw();
+                }
+            });
+
+            // 图片查看器功能
+            window.imageViewerState = {
+                zoom: 1,
+                panX: 0,
+                panY: 0,
+                isDragging: false,
+                startX: 0,
+                startY: 0,
+                initialized: false
+            };
+
+            function updateImageZoom() {
+                const img = document.getElementById('largeImageView');
+                const zoomLevel = document.getElementById('imageZoomLevel');
+                if (img && zoomLevel) {
+                    const scale = window.imageViewerState.zoom;
+                    const panX = window.imageViewerState.panX;
+                    const panY = window.imageViewerState.panY;
+                    img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+                    img.style.transition = 'none'; // 移除 transition 以确保拖拽流畅
+                    zoomLevel.textContent = Math.round(scale * 100) + '%';
+                }
+            }
+
+            function zoomImage(delta) {
+                window.imageViewerState.zoom = Math.max(0.1, Math.min(5, window.imageViewerState.zoom + delta));
+                updateImageZoom();
+            }
+
+            function resetImageZoom() {
+                window.imageViewerState.zoom = 1;
+                window.imageViewerState.panX = 0;
+                window.imageViewerState.panY = 0;
+                updateImageZoom();
+            }
+
+            function closeImageViewer() {
+                const modal = document.getElementById('imageViewerModal');
+                if (modal) {
+                    modal.classList.remove('active');
+                    resetImageZoom();
+                }
+            }
+
+            function initImageViewerDrag() {
+                const container = document.getElementById('imageViewerContainer');
+                const img = document.getElementById('largeImageView');
+
+                if (!container || !img) {
+                    console.log('[图片查看器] 未找到容器或图片元素');
+                    return;
+                }
+
+                if (window.imageViewerState.initialized) {
+                    console.log('[图片查看器] 已经初始化，跳过');
+                    return;
+                }
+
+                console.log('[图片查看器] 初始化拖拽功能');
+                window.imageViewerState.initialized = true;
+
+                // 滚轮缩放（苹果鼠标左滑缩小、右滑放大）
+                const wheelHandler = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // 使用 deltaX 检测水平滚动（苹果鼠标滑动）
+                    let zoomDelta = 0;
+                    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                        // 水平滚动：左滑（deltaX > 0）缩小，右滑（deltaX < 0）放大
+                        zoomDelta = e.deltaX > 0 ? -0.1 : 0.1;
+                    } else {
+                        // 垂直滚动：向上（deltaY < 0）放大，向下（deltaY > 0）缩小
+                        zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
+                    }
+
+                    zoomImage(zoomDelta);
+                };
+
+                container.addEventListener('wheel', wheelHandler, { passive: false });
+
+                // 拖拽功能
+                const startDrag = (e) => {
+                    if (e.button === 0) { // 左键
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[拖拽] 开始拖拽', { clientX: e.clientX, clientY: e.clientY });
+                        window.imageViewerState.isDragging = true;
+                        window.imageViewerState.startX = e.clientX - window.imageViewerState.panX;
+                        window.imageViewerState.startY = e.clientY - window.imageViewerState.panY;
+                        container.style.cursor = 'grabbing';
+                        document.body.style.cursor = 'grabbing';
+                    }
+                };
+
+                const doDrag = (e) => {
+                    if (window.imageViewerState.isDragging) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.imageViewerState.panX = e.clientX - window.imageViewerState.startX;
+                        window.imageViewerState.panY = e.clientY - window.imageViewerState.startY;
+                        updateImageZoom();
+                    }
+                };
+
+                const endDrag = () => {
+                    if (window.imageViewerState.isDragging) {
+                        console.log('[拖拽] 结束拖拽');
+                        window.imageViewerState.isDragging = false;
+                        container.style.cursor = 'grab';
+                        document.body.style.cursor = '';
+                    }
+                };
+
+                // 在容器上添加拖拽监听
+                container.addEventListener('mousedown', startDrag);
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('mouseup', endDrag);
+
+                // 设置默认光标
+                container.style.cursor = 'grab';
+
+                // 禁用图片默认拖拽
+                img.ondragstart = () => false;
+                img.style.userSelect = 'none';
+                img.style.pointerEvents = 'none'; // 让事件穿透到容器
+
+                console.log('[图片查看器] 拖拽功能初始化完成');
+            }
+
+            // 在 DOM 加载完成后初始化
+            document.addEventListener('DOMContentLoaded', function() {
+                // 延迟初始化，确保元素已经创建
+                setTimeout(initImageViewerDrag, 100);
+            });
+        });
+    </script>
+    <div id="shortcutBar" class="shortcut-bar" style="display:none;">
+        <span class="label">快捷方式</span>
+        <div class="shortcut-pills" id="shortcutPills"></div>
+        <div class="shortcut-buttons">
+            <button class="shortcut-manage-btn" id="shortcutDirectionBtn" title="切换方向">⇄</button>
+            <button class="shortcut-manage-btn" id="shortcutManageBtn">管理</button>
+        </div>
+    </div>
+    <div id="shortcutManagePanel" class="shortcut-manage-panel">
+        <header>
+            <span>快捷方式管理</span>
+            <button id="shortcutManageClose" class="shortcut-manage-btn" style="padding:4px 8px;">关闭</button>
+        </header>
+        <div class="shortcut-manage-list" id="shortcutManageList"></div>
+    </div>
+    <script src="storage-adapter.js"></script>
+    <script src="assets/crypto-js.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

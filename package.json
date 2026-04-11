@@ -1,0 +1,24 @@
+{
+  "name": "mindmap-editor",
+  "version": "1.0.0",
+  "description": "Web-based mind map editor for explaining code with drag and drop functionality",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "mindmap",
+    "editor",
+    "visualization",
+    "code"
+  ],
+  "author": "StellarStar255",
+  "license": "MIT",
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
