@@ -2331,13 +2331,19 @@
                 localStorage.setItem(NIGHT_MODE_KEY, 'false');
             }
 
-            // Redraw canvas to update line colors
-            if (window.app) {
-                if (window.app.leftCanvas) {
-                    window.app.leftCanvas.draw();
+            // 立刻重绘两个画板以应用新的夜间/日间配色
+            if (typeof AppState !== 'undefined') {
+                if (AppState.appLeft && typeof AppState.appLeft.draw === 'function') {
+                    AppState.appLeft.draw();
+                    if (typeof AppState.appLeft.renderMinimap === 'function') {
+                        AppState.appLeft.renderMinimap();
+                    }
                 }
-                if (window.app.rightCanvas) {
-                    window.app.rightCanvas.draw();
+                if (AppState.appRight && typeof AppState.appRight.draw === 'function') {
+                    AppState.appRight.draw();
+                    if (typeof AppState.appRight.renderMinimap === 'function') {
+                        AppState.appRight.renderMinimap();
+                    }
                 }
             }
         });
