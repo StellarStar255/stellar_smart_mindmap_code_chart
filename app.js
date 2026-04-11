@@ -11,33 +11,22 @@ function escapeHTML(text) {
 
 // 颜色反转函数
 function invertColor(hex) {
-    // 移除 # 符号
-    if (hex.startsWith('#')) {
-        hex = hex.slice(1);
+    if (typeof hex !== 'string') return hex;
+
+    // 仅支持 #rgb / #rrggbb 格式；其它格式（rgb()、命名色等）原样返回
+    if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return hex;
+
+    let raw = hex.slice(1);
+    if (raw.length === 3) {
+        raw = raw.split('').map(char => char + char).join('');
     }
 
-    // 处理简写颜色（如 #fff）
-    if (hex.length === 3) {
-        hex = hex.split('').map(char => char + char).join('');
-    }
+    const r = 255 - parseInt(raw.substr(0, 2), 16);
+    const g = 255 - parseInt(raw.substr(2, 2), 16);
+    const b = 255 - parseInt(raw.substr(4, 2), 16);
 
-    // 转换为 RGB
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-
-    // 反转颜色
-    const invertedR = 255 - r;
-    const invertedG = 255 - g;
-    const invertedB = 255 - b;
-
-    // 转换回十六进制
-    const toHex = (num) => {
-        const hex = num.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-    };
-
-    return '#' + toHex(invertedR) + toHex(invertedG) + toHex(invertedB);
+    const toHex = (num) => num.toString(16).padStart(2, '0');
+    return '#' + toHex(r) + toHex(g) + toHex(b);
 }
 
 // URL检测函数
@@ -2805,7 +2794,7 @@ class MindMapApp {
 
         // 清空小地图
         const isNightMode = document.body.classList.contains('night-mode');
-        ctx.fillStyle = isNightMode ? '#000000' : '#ffffff';
+        ctx.fillStyle = isNightMode ? '#1a1a2e' : '#ffffff';
         ctx.fillRect(0, 0, width, height);
 
         if (!this.nodes || this.nodes.length === 0) {
@@ -8838,7 +8827,7 @@ class MindMapApp {
         const textColor = isNightMode ? invertColor('#333') : '#333';
 
         // 清空画布
-        this.ctx.fillStyle = isNightMode ? '#000000' : 'white';
+        this.ctx.fillStyle = isNightMode ? '#1a1a2e' : 'white';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.save();
@@ -9177,7 +9166,8 @@ class MindMapApp {
         if (isNightMode === null) isNightMode = document.body.classList.contains('night-mode');
         if (normalColor === null) normalColor = isNightMode ? invertColor('#667eea') : '#667eea';
         if (textColor === null) textColor = isNightMode ? invertColor('#333') : '#333';
-        const baseTextColor = node.textColor || textColor;
+        const rawTextColor = node.textColor || '#333';
+        const baseTextColor = isNightMode ? invertColor(rawTextColor) : rawTextColor;
 
         const isSelected = this.selectedNode === node;
         const isFrameSelected = this.selectedNodes.includes(node);
@@ -11406,7 +11396,7 @@ class MindMapApp {
 
                 // 根据夜间模式设置背景
                 const isNightMode = document.body.classList.contains('night-mode');
-                tempCtx.fillStyle = isNightMode ? '#000000' : 'white';
+                tempCtx.fillStyle = isNightMode ? '#1a1a2e' : 'white';
                 tempCtx.fillRect(0, 0, width, height);
 
                 // 平移坐标系
@@ -11512,7 +11502,7 @@ class MindMapApp {
         }
 
         const isNightMode = document.body.classList.contains('night-mode');
-        finalCtx.fillStyle = isNightMode ? '#000000' : 'white';
+        finalCtx.fillStyle = isNightMode ? '#1a1a2e' : 'white';
         finalCtx.fillRect(0, 0, finalWidth, finalHeight);
 
         // 逐块渲染
@@ -11593,7 +11583,7 @@ class MindMapApp {
 
             tileCtx.imageSmoothingEnabled = false;
             tileCtx.scale(scale, scale);
-            tileCtx.fillStyle = isNightMode ? '#000000' : 'white';
+            tileCtx.fillStyle = isNightMode ? '#1a1a2e' : 'white';
             tileCtx.fillRect(0, 0, tileWidth / scale, tileHeight / scale);
 
             tileCtx.translate(-minX + padding - offsetX, -minY + padding - offsetY);
@@ -11697,7 +11687,7 @@ class MindMapApp {
             }
 
             tempCtx.scale(scale, scale);
-            tempCtx.fillStyle = isNightMode ? '#000000' : 'white';
+            tempCtx.fillStyle = isNightMode ? '#1a1a2e' : 'white';
             tempCtx.fillRect(0, 0, width, height);
             tempCtx.translate(-minX + padding, -minY + padding);
 
@@ -13327,6 +13317,8 @@ class MindMapApp {
         const fontSize = node.fontSize || 13;
         const lineHeight = fontSize * 1.3;
         const textAlign = node.textAlign || 'center';
+        const rawTextColor = node.textColor || '#333';
+        const baseTextColor = isNightMode ? invertColor(rawTextColor) : rawTextColor;
 
         // 先计算总内容高度，以便垂直居中
         let totalContentHeight = 0;
@@ -13376,7 +13368,7 @@ class MindMapApp {
             }
 
             if (item.type === 'text') {
-                ctx.fillStyle = isNightMode ? invertColor('#333') : '#333';
+                ctx.fillStyle = baseTextColor;
                 ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'top';
@@ -13423,7 +13415,7 @@ class MindMapApp {
                 ctx.textBaseline = 'top';
 
                 // 绘制标题（粗体）
-                ctx.fillStyle = isNightMode ? invertColor('#333') : '#333';
+                ctx.fillStyle = baseTextColor;
                 ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
                 const titleLines = this.wrapText(item.title || item.url, node.width - this.NODE_HORIZONTAL_PADDING, ctx);
                 titleLines.forEach(line => {
@@ -13467,7 +13459,7 @@ class MindMapApp {
                 currentY += lineHeight * 0.8;
             } else if (item.type === 'pending_link') {
                 // 待处理的链接，暂时显示为普通文本
-                ctx.fillStyle = isNightMode ? invertColor('#333') : '#333';
+                ctx.fillStyle = baseTextColor;
                 ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
                 ctx.textAlign = textAlign;
                 ctx.textBaseline = 'top';
