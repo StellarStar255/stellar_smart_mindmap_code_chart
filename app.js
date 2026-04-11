@@ -2957,7 +2957,7 @@ class MindMapApp {
         const hasOverlap = vpRight > 0 && vpLeft < width && vpBottom > 0 && vpTop < height;
         
         if (hasOverlap) {
-            ctx.strokeStyle = '#ff6b6b';
+            ctx.strokeStyle = isNightMode ? '#4ade80' : '#ff6b6b';
             ctx.lineWidth = 2;
             ctx.beginPath();
 
