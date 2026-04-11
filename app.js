@@ -29,6 +29,58 @@ function invertColor(hex) {
     return '#' + toHex(r) + toHex(g) + toHex(b);
 }
 
+// 将任意 hex 颜色解析为 { r, g, b }
+function _parseHex(hex) {
+    if (typeof hex !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) return null;
+    let raw = hex.slice(1);
+    if (raw.length === 3) raw = raw.split('').map(c => c + c).join('');
+    return {
+        r: parseInt(raw.substr(0, 2), 16),
+        g: parseInt(raw.substr(2, 2), 16),
+        b: parseInt(raw.substr(4, 2), 16)
+    };
+}
+
+function _rgbToHex(r, g, b) {
+    const to = n => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+    return '#' + to(r) + to(g) + to(b);
+}
+
+// 夜间模式专用：把原本为浅色/中等亮度的节点填充色，映射成深色调上好看的版本
+// 思路：
+//   - 极暗色（亮度 < 0.22）：用户显式选择了深色，保持原色
+//   - 其它颜色：保留原色相，压低亮度至 ~18%，并向夜间底色 #1a1a2e 混入 65%
+//     既保住用户能识别的颜色倾向，又不会在 #1a1a2e 画布上显得刺眼
+function toNightFillColor(hex) {
+    const rgb = _parseHex(hex);
+    if (!rgb) return hex;
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    if (luminance < 0.22) return hex;
+    // 与夜间底色混合
+    const baseR = 0x1a, baseG = 0x1a, baseB = 0x2e;
+    const mix = 0.65;
+    // 压低原色亮度到 ~50% 后再混入底色，避免混出一团“泥”
+    const dim = 0.5;
+    const r = rgb.r * dim * (1 - mix) + baseR * mix;
+    const g = rgb.g * dim * (1 - mix) + baseG * mix;
+    const b = rgb.b * dim * (1 - mix) + baseB * mix;
+    return _rgbToHex(r, g, b);
+}
+
+// 夜间模式专用：节点边框色
+// 默认 #667eea 反转成土黄色太刺眼，改成柔和的亮靛蓝
+const NIGHT_BORDER_DEFAULT = '#818cf8';
+function toNightBorderColor(hex) {
+    if (hex === '#667eea') return NIGHT_BORDER_DEFAULT;
+    const rgb = _parseHex(hex);
+    if (!rgb) return hex;
+    // 对非默认边框，按亮度判断是否需要提亮到夜间可见
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    if (luminance > 0.4) return hex;
+    // 偏暗的边框提亮 60%
+    return _rgbToHex(rgb.r + (255 - rgb.r) * 0.6, rgb.g + (255 - rgb.g) * 0.6, rgb.b + (255 - rgb.b) * 0.6);
+}
+
 // URL检测函数
 function isURL(text) {
     const trimmed = text.trim();
@@ -2834,7 +2886,7 @@ class MindMapApp {
         ctx.scale(scale, scale);
 
         // 绘制连接线
-        ctx.strokeStyle = isNightMode ? invertColor('#667eea') : '#667eea';
+        ctx.strokeStyle = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
         ctx.lineWidth = 1 / scale;
         this.connections.forEach(connection => {
             const { x1, y1, x2, y2 } = this.getConnectionEndpoints(connection);
@@ -2847,7 +2899,7 @@ class MindMapApp {
 
         // 绘制节点
         this.nodes.forEach(node => {
-            const nodeColor = isNightMode ? invertColor(node.color) : node.color;
+            const nodeColor = isNightMode ? toNightFillColor(node.color) : node.color;
             ctx.fillStyle = nodeColor;
             ctx.fillRect(node.x, node.y, node.width, node.height);
 
@@ -2876,7 +2928,7 @@ class MindMapApp {
                 }
             }
 
-            ctx.strokeStyle = isNightMode ? invertColor('#667eea') : '#667eea';
+            ctx.strokeStyle = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
             ctx.lineWidth = 1 / scale;
             ctx.strokeRect(node.x, node.y, node.width, node.height);
         });
@@ -8823,7 +8875,7 @@ class MindMapApp {
         const isNightMode = document.body.classList.contains('night-mode');
 
         // 预计算常用颜色（避免重复计算）
-        const normalColor = isNightMode ? invertColor('#667eea') : '#667eea';
+        const normalColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
         const textColor = isNightMode ? invertColor('#333') : '#333';
 
         // 清空画布
@@ -8917,7 +8969,7 @@ class MindMapApp {
             const y2 = this.connectionEndPos.y;
 
             // 如果悬停在有效节点上，改变线条颜色为绿色
-            const normalColor = isNightMode ? invertColor('#667eea') : '#667eea';
+            const normalColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
             this.ctx.strokeStyle = this.connectionHoveredNode ? '#4caf50' : normalColor;
             this.ctx.lineWidth = 2;
             this.ctx.setLineDash([5, 5]);
@@ -8951,7 +9003,7 @@ class MindMapApp {
             const width = endX - startX;
             const height = endY - startY;
 
-            const normalColor = isNightMode ? invertColor('#667eea') : '#667eea';
+            const normalColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
             // 从 normalColor 提取 RGB 值用于半透明填充
             const rgb = normalColor.match(/\w\w/g).map(x => parseInt(x, 16));
             const fillColor = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.1)`;
@@ -9164,7 +9216,7 @@ class MindMapApp {
 
     drawNode(node, isNightMode = null, normalColor = null, textColor = null) {
         if (isNightMode === null) isNightMode = document.body.classList.contains('night-mode');
-        if (normalColor === null) normalColor = isNightMode ? invertColor('#667eea') : '#667eea';
+        if (normalColor === null) normalColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
         if (textColor === null) textColor = isNightMode ? invertColor('#333') : '#333';
         const rawTextColor = node.textColor || '#333';
         const baseTextColor = isNightMode ? invertColor(rawTextColor) : rawTextColor;
@@ -9176,7 +9228,7 @@ class MindMapApp {
         const fontFamily = codeMode ? this.codeFontStack : 'sans-serif';
         const resolvedLanguage = this.resolveNodeLanguage(node);
 
-        const nodeColor = isNightMode ? invertColor(node.color) : node.color;
+        const nodeColor = isNightMode ? toNightFillColor(node.color) : node.color;
         // 在 code 模式下，节点整体背景与代码块一致，保证视觉统一；文字颜色随背景自动调整
         let codeBg = null;
         let codeTextColor = baseTextColor;
@@ -9430,7 +9482,7 @@ class MindMapApp {
                 });
 
                 // 绘制URL（小号，链接颜色）
-                const linkColor = isNightMode ? invertColor('#667eea') : '#667eea';
+                const linkColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
                 this.ctx.fillStyle = linkColor;
                 this.ctx.font = `${Math.max(fontSize * 0.75, 10)}px sans-serif`;
 
@@ -13303,9 +13355,9 @@ class MindMapApp {
 
     drawNodeOnContext(ctx, node, scale = 1) {
         const isNightMode = document.body.classList.contains('night-mode');
-        const nodeColor = isNightMode ? invertColor(node.color) : node.color;
+        const nodeColor = isNightMode ? toNightFillColor(node.color) : node.color;
         ctx.fillStyle = nodeColor;
-        ctx.strokeStyle = isNightMode ? invertColor('#667eea') : '#667eea';
+        ctx.strokeStyle = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
         ctx.lineWidth = 2;
         // 使用节点的shape属性，如果没有则默认为rounded-rect（向前兼容）
         const shape = node.shape || 'rounded-rect';
@@ -13432,7 +13484,7 @@ class MindMapApp {
                 });
 
                 // 绘制URL（小号，链接颜色）
-                const linkColor = isNightMode ? invertColor('#667eea') : '#667eea';
+                const linkColor = isNightMode ? NIGHT_BORDER_DEFAULT : '#667eea';
                 ctx.fillStyle = linkColor;
                 ctx.font = `${Math.max(fontSize * 0.75, 10)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 
