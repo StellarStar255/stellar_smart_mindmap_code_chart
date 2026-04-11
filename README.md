@@ -4,7 +4,9 @@
 
 A zero-dependency, web-based mind map editor designed for **explaining code and architecture visually**. Built with plain Node.js (no framework) — the only runtime dependency is `ws` for real-time collaboration.
 
-![screenshot](./assets/code_chart_mindmap.png)
+<p align="center">
+  <img src="./assets/code_chart_mindmap.png" alt="screenshot" width="420" />
+</p>
 
 ## Features
 

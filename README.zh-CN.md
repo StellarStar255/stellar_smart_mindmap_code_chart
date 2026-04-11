@@ -4,7 +4,9 @@
 
 一个零依赖、基于 Web 的脑图编辑器,专为**可视化讲解代码与架构**而设计。使用原生 Node.js 实现(无任何前端框架),唯一的运行时依赖是 `ws`,用于实时协作。
 
-![截图](./assets/code_chart_mindmap.png)
+<p align="center">
+  <img src="./assets/code_chart_mindmap.png" alt="截图" width="420" />
+</p>
 
 ## 功能特性
 
