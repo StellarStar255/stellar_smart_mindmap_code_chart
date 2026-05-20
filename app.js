@@ -5698,6 +5698,24 @@ class MindMapApp {
         });
 
         editableDiv.addEventListener('blur', () => this.finishNodeEditing());
+
+        // 粘贴：强制只粘纯文本，避免浏览器塞进 <meta>/带样式的 span/wrapper
+        // 导致 DOM walker 漏处理
+        editableDiv.addEventListener('paste', (e) => {
+            if (!e.clipboardData) return;
+            // 如果是图片，让全局粘贴 handler 处理
+            const items = e.clipboardData.items;
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type && items[i].type.indexOf('image') !== -1) return;
+                }
+            }
+            const text = e.clipboardData.getData('text/plain');
+            if (text == null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            document.execCommand('insertText', false, text);
+        });
     }
 
     finishNodeEditing() {
