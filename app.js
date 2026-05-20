@@ -6165,7 +6165,10 @@ class MindMapApp {
                 isFirstItem = false;
             } else if (item.type === 'text') {
                 this.ctx.font = `${fontSize}px ${node.codeMode ? this.codeFontStack : 'sans-serif'}`;
-                const lines = this.wrapText(item.value, 400, this.ctx);
+                // code 模式下不做软换行（与 drawNode 保持一致），按硬换行切行，节点宽度按最长行扩展
+                const lines = node.codeMode
+                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
+                    : this.wrapText(item.value, 400, this.ctx);
                 const textHeight = lines.length * lineHeight;
                 const textWidth = lines.reduce((max, line) => Math.max(max, this.ctx.measureText(line).width), 0);
 
@@ -9321,7 +9324,10 @@ class MindMapApp {
             } else if (item.type === 'text') {
                 this.ctx.font = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
-                const lines = this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
+                // code 模式下不做软换行（保持与渲染路径一致），高度按硬换行行数算
+                const lines = codeMode
+                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
+                    : this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
                 totalContentHeight += lines.length * lineHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'link') {
@@ -9426,7 +9432,11 @@ class MindMapApp {
                 this.ctx.textBaseline = 'top';
 
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
-                const lines = this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
+                // code 模式下不做软换行：软换行会打断 highlighter 对字符串/注释的上下文感知，
+                // 让中间被切断的那段失去高亮。只在用户的硬换行 \n 处分行。
+                const lines = codeMode
+                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
+                    : this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
                 const maxLineWidth = lines.reduce((max, line) => Math.max(max, this.ctx.measureText(line).width), 0);
                 const bgPaddingX = 8;
                 const bgPaddingY = 6;
