@@ -5731,7 +5731,11 @@ class MindMapApp {
 
         const pushTextAndLinksFromText = (rawText) => {
             if (rawText === undefined || rawText === null) return;
-            const text = String(rawText).replace(/\u00A0/g, ' ');
+            // \u4EC5\u5265\u79BB\u9996\u5C3E\u7684\u6362\u884C\uFF08DOM walker \u5728 <div>/<br> \u672B\u5C3E\u8FFD\u52A0\u7684\u6B8B\u7559\uFF09\uFF0C
+            // \u4FDD\u7559\u6240\u6709 tab/\u7A7A\u683C\uFF08\u5305\u62EC\u884C\u9996\u7F29\u8FDB\u548C\u4E2D\u95F4\u7A7A\u767D\uFF09
+            const text = String(rawText)
+                .replace(/\u00A0/g, ' ')
+                .replace(/^[\r\n]+|[\r\n]+$/g, '');
             const trimmed = text.trim();
             if (!trimmed) return;
 
