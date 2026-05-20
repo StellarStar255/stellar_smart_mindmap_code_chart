@@ -4658,38 +4658,32 @@ class MindMapApp {
                     }
                 }
 
-                // Tab 键 - 创建子节点
+                // Tab 键
                 if (e.key === 'Tab') {
                     const activeElement = document.activeElement;
 
-                    // 检查是否在节点编辑的 textarea 中
-                    const isNodeEditTextarea = activeElement &&
-                        activeElement.id === 'nodeEditTextarea';
+                    // 节点内编辑器（contentEditable div）
+                    const isNodeEditor = activeElement &&
+                        activeElement.id === 'nodeEditText';
 
-                    // 检查是否在侧边栏的输入框中
+                    // 侧边栏的普通输入框
                     const isSidebarInput = activeElement && (
-                        (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') &&
-                        !isNodeEditTextarea
+                        activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA'
                     );
 
-                    // 如果在侧边栏输入框中，保持默认Tab行为
                     if (isSidebarInput) {
+                        // 保持默认Tab行为（在表单间切换）
                         return;
                     }
 
-                    // 如果在节点编辑 textarea 中或画布上有选中节点
-                    if (isNodeEditTextarea && activeApp.editingNode) {
-                        // 在编辑状态下按 Tab：先保存当前编辑，然后创建子节点
+                    if (isNodeEditor) {
+                        // 在节点编辑器内：插入一个 tab 字符，而不是创建子节点
                         e.preventDefault();
-                        const parentNode = activeApp.editingNode;
-                        activeApp.finishNodeEditing();
-
-                        // 使用 setTimeout 确保编辑完成和重绘完成后再创建子节点
-                        setTimeout(() => {
-                            activeApp.createChildNode(parentNode);
-                        }, 10);
+                        if (!e.shiftKey) {
+                            document.execCommand('insertText', false, '\t');
+                        }
                     } else if (activeApp.selectedNode) {
-                        // 在非编辑状态下按 Tab：直接创建子节点
+                        // 非编辑状态下按 Tab：创建子节点
                         e.preventDefault();
                         activeApp.createChildNode(activeApp.selectedNode);
                     }
@@ -5758,7 +5752,8 @@ class MindMapApp {
                 matchedAny = true;
                 const before = text.slice(lastIndex, match.index);
                 if (before && before.trim()) {
-                    newContent.push({ type: 'text', value: before.trim() });
+                    // 保留前后空白/tab，只在判空时 trim
+                    newContent.push({ type: 'text', value: before });
                 }
 
                 const urlText = (match[1] || '').trim();
@@ -5773,11 +5768,11 @@ class MindMapApp {
             if (matchedAny) {
                 const after = text.slice(lastIndex);
                 if (after && after.trim()) {
-                    newContent.push({ type: 'text', value: after.trim() });
+                    newContent.push({ type: 'text', value: after });
                 }
             } else {
-                // 无http(s)链接，作为普通文本
-                newContent.push({ type: 'text', value: trimmed });
+                // 无http(s)链接，作为普通文本（保留内部 tab/空格）
+                newContent.push({ type: 'text', value: text });
             }
         };
 
@@ -9639,7 +9634,9 @@ class MindMapApp {
     }
 
     wrapText(text, maxWidth, ctx) {
-        const paragraphs = text.split(/\r?\n/);
+        // 把 tab 展开成 4 个空格，canvas 2D 不会渲染 \t
+        const normalized = String(text == null ? '' : text).replace(/\t/g, '    ');
+        const paragraphs = normalized.split(/\r?\n/);
         let lines = [];
 
         // 辅助函数：按字符强制换行（用于超长单词）
@@ -9704,9 +9701,15 @@ class MindMapApp {
                 // 长代码：继续执行换行逻辑
             }
 
+            // 保留行首空白（含展开自 tab 的空格），避免 split(' ') 把缩进吞掉
+            const leadingMatch = paragraph.match(/^ +/);
+            const leading = leadingMatch ? leadingMatch[0] : '';
+            const body = leading ? paragraph.slice(leading.length) : paragraph;
+
             // Split by spaces to preserve words
-            const words = paragraph.split(' ');
-            let line = '';
+            const words = body.split(' ');
+            let line = leading;
+            let firstWord = true;
 
             for (let i = 0; i < words.length; i++) {
                 const word = words[i];
@@ -9723,13 +9726,14 @@ class MindMapApp {
                     const charLines = wrapByCharacter(word);
                     lines.push(...charLines.slice(0, -1)); // 添加完整的行
                     line = charLines[charLines.length - 1]; // 最后一行可能还能加内容
+                    firstWord = false;
                     continue;
                 }
 
-                const testLine = line ? line + ' ' + word : word;
+                const testLine = firstWord ? line + word : line + ' ' + word;
                 const testWidth = ctx.measureText(testLine).width;
 
-                if (testWidth > maxWidth && line) {
+                if (testWidth > maxWidth && line && !firstWord) {
                     // Current line is full, push it and start new line
                     lines.push(line);
                     line = word;
@@ -9737,6 +9741,7 @@ class MindMapApp {
                     // Word fits on current line
                     line = testLine;
                 }
+                firstWord = false;
             }
 
             if (line) lines.push(line);
