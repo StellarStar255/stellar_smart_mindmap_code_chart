@@ -6165,10 +6165,18 @@ class MindMapApp {
                 isFirstItem = false;
             } else if (item.type === 'text') {
                 this.ctx.font = `${fontSize}px ${node.codeMode ? this.codeFontStack : 'sans-serif'}`;
-                // code 模式下不做软换行（与 drawNode 保持一致），按硬换行切行，节点宽度按最长行扩展
-                const lines = node.codeMode
-                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
-                    : this.wrapText(item.value, 400, this.ctx);
+                // code 模式下使用相同的 token-aware 换行算法（不取 tokens，只要 text/区间），
+                // 与 drawNode 保持一致：节点会扩展到容纳软换行后的最长视觉行
+                let lines;
+                if (node.codeMode) {
+                    const normalized = String(item.value || '').replace(/\t/g, '    ');
+                    lines = [];
+                    normalized.split(/\r?\n/).forEach(p => {
+                        this._wrapCodeLine(p, 400, this.ctx).forEach(v => lines.push(v.text));
+                    });
+                } else {
+                    lines = this.wrapText(item.value, 400, this.ctx);
+                }
                 const textHeight = lines.length * lineHeight;
                 const textWidth = lines.reduce((max, line) => Math.max(max, this.ctx.measureText(line).width), 0);
 
@@ -9324,11 +9332,19 @@ class MindMapApp {
             } else if (item.type === 'text') {
                 this.ctx.font = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
-                // code 模式下不做软换行（保持与渲染路径一致），高度按硬换行行数算
-                const lines = codeMode
-                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
-                    : this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
-                totalContentHeight += lines.length * lineHeight;
+                const wrapMaxWidth = node.width - paddingX * 2;
+                // code 模式下使用 token-aware 软换行的视觉行数，与渲染路径保持一致
+                let lineCount;
+                if (codeMode) {
+                    const normalized = String(item.value || '').replace(/\t/g, '    ');
+                    lineCount = 0;
+                    normalized.split(/\r?\n/).forEach(p => {
+                        lineCount += this._wrapCodeLine(p, wrapMaxWidth, this.ctx).length;
+                    });
+                } else {
+                    lineCount = this.wrapText(item.value, wrapMaxWidth, this.ctx).length;
+                }
+                totalContentHeight += lineCount * lineHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'link') {
                 // 链接类型：显示标题（粗体）和URL（小号）
@@ -9432,11 +9448,15 @@ class MindMapApp {
                 this.ctx.textBaseline = 'top';
 
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
-                // code 模式下不做软换行：软换行会打断 highlighter 对字符串/注释的上下文感知，
-                // 让中间被切断的那段失去高亮。只在用户的硬换行 \n 处分行。
+                const wrapMaxWidth = node.width - paddingX * 2;
+                // code 模式下使用 token-aware 软换行：先对整段 tokenize，再按字符区间切到视觉行，
+                // 这样字符串/注释跨视觉行也能保持高亮。非 code 模式走原来的 wrapText。
+                const codeLines = codeMode
+                    ? this._buildCodeLines(item.value, wrapMaxWidth, this.ctx, resolvedLanguage, codeTextColor, codeBg, isNightMode)
+                    : null;
                 const lines = codeMode
-                    ? String(item.value || '').replace(/\t/g, '    ').split(/\r?\n/)
-                    : this.wrapText(item.value, node.width - paddingX * 2, this.ctx);
+                    ? codeLines.map(l => l.text)
+                    : this.wrapText(item.value, wrapMaxWidth, this.ctx);
                 const maxLineWidth = lines.reduce((max, line) => Math.max(max, this.ctx.measureText(line).width), 0);
                 const bgPaddingX = 8;
                 const bgPaddingY = 6;
@@ -9460,7 +9480,7 @@ class MindMapApp {
                     this.ctx.fillStyle = codeTextColor;
                 }
 
-                lines.forEach(line => {
+                lines.forEach((line, lineIdx) => {
                     let textX;
                     if (textAlign === 'left') {
                         textX = node.x + paddingX;
@@ -9471,12 +9491,11 @@ class MindMapApp {
                     }
 
                     if (codeMode) {
-                        const tokens = this.highlightCode(line, resolvedLanguage, codeTextColor, codeBg, isNightMode);
+                        const lineTokens = codeLines[lineIdx].tokens || [];
                         let cursorX = textX;
-                        tokens.forEach(token => {
+                        lineTokens.forEach(token => {
                             this.ctx.fillStyle = token.color || codeTextColor;
                             const textToDraw = token.text || '';
-                            // 对齐基于整体位置，逐token绘制
                             this.ctx.fillText(textToDraw, cursorX, currentY);
                             cursorX += this.ctx.measureText(textToDraw).width;
                         });
@@ -9779,6 +9798,103 @@ class MindMapApp {
             if (line) lines.push(line);
         });
         return lines;
+    }
+
+    // 给 code 模式用的换行：按宽度软换行，但保留每段在原始行中的字符区间 [start, end)，
+    // 这样调用方可以把"按整行 tokenize 出来的 tokens"按区间切到对应的视觉行上，
+    // 高亮上下文（比如未闭合的字符串）就不会因为软换行而被打断。
+    // 输入 line 不能包含换行符（调用方先按 \n split）。
+    _wrapCodeLine(line, maxWidth, ctx) {
+        if (line == null) return [{ text: '', start: 0, end: 0 }];
+        if (line === '' || maxWidth <= 0) {
+            return [{ text: line, start: 0, end: line.length }];
+        }
+        if (ctx.measureText(line).width <= maxWidth) {
+            return [{ text: line, start: 0, end: line.length }];
+        }
+
+        const segments = [];
+        let curStart = 0;
+        let i = 0;
+        let lastSpace = -1; // 当前段内最后一个空格的索引
+
+        while (i < line.length) {
+            if (line[i] === ' ') lastSpace = i;
+            const segWidth = ctx.measureText(line.substring(curStart, i + 1)).width;
+
+            if (segWidth > maxWidth && i > curStart) {
+                let breakEnd, nextStart;
+                if (lastSpace > curStart) {
+                    // 在最近的空格处换行，丢弃这个空格本身
+                    breakEnd = lastSpace;
+                    nextStart = lastSpace + 1;
+                } else {
+                    // 整段没有空格，强制按字符断
+                    breakEnd = i;
+                    nextStart = i;
+                }
+                segments.push({
+                    text: line.substring(curStart, breakEnd),
+                    start: curStart,
+                    end: breakEnd,
+                });
+                curStart = nextStart;
+                i = curStart;
+                lastSpace = -1;
+            } else {
+                i++;
+            }
+        }
+
+        if (curStart < line.length) {
+            segments.push({
+                text: line.substring(curStart),
+                start: curStart,
+                end: line.length,
+            });
+        } else if (segments.length === 0) {
+            segments.push({ text: '', start: 0, end: 0 });
+        }
+
+        return segments;
+    }
+
+    // 给 code 模式用的视觉行构造：把一段原始 item.value（可能含 \n 和 \t）切成视觉行，
+    // 每个视觉行附带 token 列表（已按字符区间切片到该视觉行）。
+    _buildCodeLines(rawValue, maxWidth, ctx, language, defaultColor, codeBg, isNightMode) {
+        const normalized = String(rawValue == null ? '' : rawValue).replace(/\t/g, '    ');
+        const paragraphs = normalized.split(/\r?\n/);
+        const result = [];
+
+        paragraphs.forEach(paragraph => {
+            const tokens = this.highlightCode(paragraph, language, defaultColor, codeBg, isNightMode) || [];
+            // 给 token 标上在 paragraph 中的字符区间
+            let pos = 0;
+            const tokenSpans = tokens.map(t => {
+                const text = t.text || '';
+                const start = pos;
+                pos += text.length;
+                return { color: t.color, start, end: pos };
+            });
+
+            const visuals = this._wrapCodeLine(paragraph, maxWidth, ctx);
+            visuals.forEach(v => {
+                const lineTokens = [];
+                for (const tok of tokenSpans) {
+                    const overlapStart = Math.max(tok.start, v.start);
+                    const overlapEnd = Math.min(tok.end, v.end);
+                    if (overlapStart < overlapEnd) {
+                        lineTokens.push({
+                            text: paragraph.substring(overlapStart, overlapEnd),
+                            color: tok.color,
+                        });
+                    }
+                }
+                result.push({ text: v.text, tokens: lineTokens });
+            });
+        });
+
+        return result;
     }
 
     getNodeLabel(node) {
