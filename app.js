@@ -4016,7 +4016,7 @@ class MindMapApp {
                 const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
                 if (activeApp && activeApp.selectedNode) {
                     const newFontSize = parseInt(document.getElementById('editFontSize').value);
-                    if (newFontSize && newFontSize >= 10 && newFontSize <= 32) {
+                    if (newFontSize && newFontSize >= 10 && newFontSize <= 200) {
                         activeApp.selectedNode.fontSize = newFontSize;
 
                         // 检查是否需要自动适应文本（跳过被锁定的节点）
@@ -5185,7 +5185,7 @@ class MindMapApp {
                 const heightScale = node.height / node._originalHeight;
                 const avgScale = (widthScale + heightScale) / 2;
                 let newFontSize = Math.round(node._originalFontSize * avgScale);
-                newFontSize = Math.max(10, Math.min(32, newFontSize));
+                newFontSize = Math.max(10, Math.min(200, newFontSize));
                 node.fontSize = newFontSize;
             }
 
