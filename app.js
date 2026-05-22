@@ -6294,6 +6294,82 @@ class MindMapApp {
                 // 长代码：继续执行换行逻辑
             }
 
+            // CJK + Latin 混排：跟 wrapText 一致，把 CJK 字符当作可换行点，
+            // 拉丁词保持原子性，避免 split(' ') 把 "（base model）" 撕成两行。
+            const cjkRegex = /[　-〿぀-ゟ゠-ヿ一-鿿＀-￯]/;
+            const effMax = maxWidth - padding;
+            if (cjkRegex.test(paragraph)) {
+                const tokens = [];
+                let latinBuf = '';
+                for (const c of Array.from(paragraph)) {
+                    if (c === ' ') {
+                        if (latinBuf) { tokens.push(latinBuf); latinBuf = ''; }
+                        tokens.push(' ');
+                    } else if (cjkRegex.test(c)) {
+                        if (latinBuf) { tokens.push(latinBuf); latinBuf = ''; }
+                        tokens.push(c);
+                    } else {
+                        latinBuf += c;
+                    }
+                }
+                if (latinBuf) tokens.push(latinBuf);
+
+                const openBrackets = new Set(['(', '（', '【', '『', '《', '[', '{']);
+                const closeBrackets = new Set([')', '）', '】', '』', '》', ']', '}']);
+                const pushLine = (l) => {
+                    const t = l.replace(/ +$/, '');
+                    lines.push(t);
+                    maxLineWidth = Math.max(maxLineWidth, ctx.measureText(t).width);
+                };
+                let line = '';
+
+                for (let i = 0; i < tokens.length; i++) {
+                    const tok = tokens[i];
+                    if (tok === ' ' && line === '') continue;
+
+                    if (tok.length > 1 && ctx.measureText(tok).width > effMax) {
+                        if (line) { pushLine(line); line = ''; }
+                        const charLines = wrapByCharacter(tok);
+                        // wrapByCharacter 内部已维护 maxLineWidth，这里只把"完整行"塞进 lines
+                        for (let k = 0; k < charLines.length - 1; k++) lines.push(charLines[k]);
+                        line = charLines[charLines.length - 1] || '';
+                        continue;
+                    }
+
+                    const testLine = line + tok;
+                    const testWidth = ctx.measureText(testLine).width;
+
+                    if (testWidth > effMax && line) {
+                        const lastChar = line.charAt(line.length - 1);
+
+                        if (openBrackets.has(lastChar) && line.length > 1) {
+                            const beforeBracket = line.slice(0, -1).replace(/ +$/, '');
+                            if (beforeBracket) {
+                                pushLine(beforeBracket);
+                                line = lastChar + (tok === ' ' ? '' : tok);
+                                continue;
+                            }
+                        }
+
+                        if (tok.length === 1 && closeBrackets.has(tok)) {
+                            const tolerance = Math.min(12, effMax * 0.05);
+                            if ((testWidth - effMax) <= tolerance) {
+                                line = testLine;
+                                continue;
+                            }
+                        }
+
+                        pushLine(line);
+                        line = tok === ' ' ? '' : tok;
+                    } else {
+                        line = testLine;
+                    }
+                }
+
+                if (line) pushLine(line);
+                return;
+            }
+
             // Split by spaces to preserve words
             const words = paragraph.split(' ');
             let currentLine = '';
@@ -9756,6 +9832,79 @@ class MindMapApp {
             const leadingMatch = paragraph.match(/^ +/);
             const leading = leadingMatch ? leadingMatch[0] : '';
             const body = leading ? paragraph.slice(leading.length) : paragraph;
+
+            // CJK + Latin 混排：把每个 CJK 字符当作可换行点，连续的拉丁词当作不可分割单元。
+            // 否则 split(' ') 会把 "一堆含金矿石（base model）" 当成两个原子词，
+            // 第一段刚好放下、第二段超长触发字符级换行，结果就把"（base"撕在行尾。
+            const cjkRegex = /[　-〿぀-ゟ゠-ヿ一-鿿＀-￯]/;
+            if (cjkRegex.test(body)) {
+                const tokens = [];
+                let latinBuf = '';
+                for (const c of Array.from(body)) {
+                    if (c === ' ') {
+                        if (latinBuf) { tokens.push(latinBuf); latinBuf = ''; }
+                        tokens.push(' ');
+                    } else if (cjkRegex.test(c)) {
+                        if (latinBuf) { tokens.push(latinBuf); latinBuf = ''; }
+                        tokens.push(c);
+                    } else {
+                        latinBuf += c;
+                    }
+                }
+                if (latinBuf) tokens.push(latinBuf);
+
+                const openBrackets = new Set(['(', '（', '【', '『', '《', '[', '{']);
+                const closeBrackets = new Set([')', '）', '】', '』', '》', ']', '}']);
+                let line = leading;
+
+                for (let i = 0; i < tokens.length; i++) {
+                    const tok = tokens[i];
+                    if (tok === ' ' && (line === '' || line === leading)) continue;
+
+                    // 如果拉丁词本身就超过 maxWidth，按字符强制切
+                    if (tok.length > 1 && ctx.measureText(tok).width > maxWidth) {
+                        if (line) { lines.push(line.replace(/ +$/, '')); line = ''; }
+                        const charLines = wrapByCharacter(tok);
+                        lines.push(...charLines.slice(0, -1));
+                        line = charLines[charLines.length - 1] || '';
+                        continue;
+                    }
+
+                    const testLine = line + tok;
+                    const testWidth = ctx.measureText(testLine).width;
+
+                    if (testWidth > maxWidth && line && line !== leading) {
+                        const lastChar = line.charAt(line.length - 1);
+
+                        // 不要把开括号单独留在行尾：把它挪到下一行陪伴下一个 token
+                        if (openBrackets.has(lastChar) && line.length > 1) {
+                            const beforeBracket = line.slice(0, -1).replace(/ +$/, '');
+                            if (beforeBracket) {
+                                lines.push(beforeBracket);
+                                line = lastChar + (tok === ' ' ? '' : tok);
+                                continue;
+                            }
+                        }
+
+                        // 闭括号允许轻微超宽以跟前一个字符同行
+                        if (tok.length === 1 && closeBrackets.has(tok)) {
+                            const tolerance = Math.min(12, maxWidth * 0.05);
+                            if ((testWidth - maxWidth) <= tolerance) {
+                                line = testLine;
+                                continue;
+                            }
+                        }
+
+                        lines.push(line.replace(/ +$/, ''));
+                        line = tok === ' ' ? '' : tok;
+                    } else {
+                        line = testLine;
+                    }
+                }
+
+                if (line) lines.push(line.replace(/ +$/, ''));
+                return;
+            }
 
             // Split by spaces to preserve words
             const words = body.split(' ');
