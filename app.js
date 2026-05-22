@@ -9538,8 +9538,10 @@ class MindMapApp {
             }
         });
 
-        // 计算起始Y位置，使内容垂直居中
-        let currentY = node.y + (node.height - totalContentHeight) / 2;
+        // 计算起始Y位置：note 节点顶部对齐（留小段上 padding），其它节点垂直居中
+        let currentY = shape === 'note'
+            ? node.y + this.TEXT_VERTICAL_PADDING / 2
+            : node.y + (node.height - totalContentHeight) / 2;
 
         // 按顺序遍历content数组，绘制图片和文本
         node.content.forEach((item, index) => {
