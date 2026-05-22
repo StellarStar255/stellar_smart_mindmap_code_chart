@@ -4846,6 +4846,8 @@ class MindMapApp {
                 // 记录右键按下的位置和节点，用于判断是点击还是拖拽
                 this.rightClickStartPos = { x: e.clientX, y: e.clientY };
                 this.rightClickNode = clickedNode;
+                // 同步记录世界坐标，空白处右键变成"插入 Note"时需要落点
+                this.rightClickWorldPos = { x: pos.x, y: pos.y };
 
                 if (clickedNode && !this.editingNode) {
                     // 右键在node上：准备文本选择
@@ -5443,6 +5445,21 @@ class MindMapApp {
                 this.rightClickStartPos = null;
                 this.rightClickNode = null;
                 return;
+            } else if (isClick && !this.rightClickNode) {
+                // 空白画布上点击右键（非拖拽）：先把进入 mousedown 时启动的平移状态收尾，
+                // 再弹出"插入 Note"菜单，落点用 mousedown 记录的世界坐标。
+                if (this.isPanning) {
+                    this.isPanning = false;
+                    this.canvas.style.cursor = 'crosshair';
+                }
+                const insertPos = this.rightClickWorldPos;
+                this.rightClickStartPos = null;
+                this.rightClickNode = null;
+                this.rightClickWorldPos = null;
+                if (insertPos) {
+                    this.showContextMenu(e.clientX, e.clientY, { insertNotePos: insertPos });
+                }
+                return;
             }
         }
 
@@ -5452,6 +5469,7 @@ class MindMapApp {
             this.canvas.style.cursor = 'crosshair';
             this.rightClickStartPos = null;
             this.rightClickNode = null;
+            this.rightClickWorldPos = null;
             return;
         }
 
@@ -6971,6 +6989,19 @@ class MindMapApp {
         const node = options.node || null;
         const hasShortcut = node && shortcutManager && shortcutManager.hasShortcut(node.id, this.currentFileName);
 
+        // 空白处右键：第一项放"插入 Note"，方便快速创建便签节点
+        if (options.insertNotePos) {
+            const insertPos = options.insertNotePos;
+            items.push({
+                id: 'ctxInsertNote',
+                label: '📝 插入 Note',
+                action: () => {
+                    this.addNoteAt(insertPos);
+                    this.hideContextMenu();
+                }
+            });
+        }
+
         if (options.imageInfo) {
             items.push({
                 id: 'ctxViewImage',
@@ -7742,6 +7773,37 @@ class MindMapApp {
         this.draw();
 
         return newNode;  // 返回新创建的节点
+    }
+
+    // 右键空白处插入便签：黄色折角，左对齐，落地后立即进入编辑态。
+    addNoteAt(pos) {
+        const defaultWidth = 200;
+        const defaultHeight = 120;
+
+        const newNode = {
+            id: Date.now() + Math.random(),
+            content: [{ type: 'text', value: '' }],
+            x: pos.x - defaultWidth / 2,
+            y: pos.y - defaultHeight / 2,
+            width: defaultWidth,
+            height: defaultHeight,
+            color: '#fef3c7',
+            textColor: '#78350f',
+            fontSize: this.currentFontSize,
+            textAlign: 'left',
+            shape: 'note',
+            properties: '',
+            codeMode: false,
+            codeLanguage: 'auto',
+        };
+
+        this.nodes.push(newNode);
+        this.selectNode(newNode);
+        this.saveToLocalStorage();
+        this.draw();
+        // 进入编辑态，让用户立刻可以打字
+        this.startNodeEditing(newNode);
+        return newNode;
     }
 
     createChildNode(parentNode) {
@@ -9310,6 +9372,19 @@ class MindMapApp {
                 ctx.rect(x, y, width, height);
                 break;
 
+            case 'note': {
+                // 便签：右上角对角斜切，形成折角的剪影。折角内部的高光由 drawNode 在
+                // fill/stroke 之后单独画一笔，drawNodeShape 这里只负责外形路径。
+                const noteFold = Math.min(width, height, 28) * 0.5;
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + width - noteFold, y);
+                ctx.lineTo(x + width, y + noteFold);
+                ctx.lineTo(x + width, y + height);
+                ctx.lineTo(x, y + height);
+                ctx.closePath();
+                break;
+            }
+
             case 'rounded-rect':
             default:
                 // 圆角矩形 (默认)
@@ -9370,6 +9445,32 @@ class MindMapApp {
         this.drawNodeShape(this.ctx, node, shape);
         this.ctx.fill();
         this.ctx.stroke();
+
+        // note 折角高光：在右上角画一个小三角作为"翻过去"的反面，颜色比纸面压暗一档。
+        if (shape === 'note') {
+            const noteFold = Math.min(node.width, node.height, 28) * 0.5;
+            const fx = node.x + node.width - noteFold;
+            const fy = node.y;
+            const baseRGB = _parseHex(nodeColor) || { r: 254, g: 243, b: 199 };
+            // 白天压暗 18%、夜间提亮 14%，让折角与纸面始终有可见对比
+            const k = isNightMode ? 1.14 : 0.82;
+            const foldR = Math.max(0, Math.min(255, baseRGB.r * k));
+            const foldG = Math.max(0, Math.min(255, baseRGB.g * k));
+            const foldB = Math.max(0, Math.min(255, baseRGB.b * k));
+            this.ctx.fillStyle = _rgbToHex(foldR, foldG, foldB);
+            this.ctx.beginPath();
+            this.ctx.moveTo(fx, fy);
+            this.ctx.lineTo(node.x + node.width, fy + noteFold);
+            this.ctx.lineTo(fx, fy + noteFold);
+            this.ctx.closePath();
+            this.ctx.fill();
+            // 折线本身用现有 strokeStyle 描一下，与节点边框统一
+            this.ctx.beginPath();
+            this.ctx.moveTo(fx, fy);
+            this.ctx.lineTo(fx, fy + noteFold);
+            this.ctx.lineTo(node.x + node.width, fy + noteFold);
+            this.ctx.stroke();
+        }
 
         // 绘制内容（支持多张图片和文本混合）
         // 确保节点有content数组
