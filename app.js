@@ -9011,7 +9011,22 @@ class MindMapApp {
         // 编辑中的节点强制走完整路径，避免编辑覆盖层错位。
         const LOD_ZOOM_THRESHOLD = 0.4;
         const useLOD = this.zoom < LOD_ZOOM_THRESHOLD;
+
+        // 视口剔除：把世界坐标视口算出来，完全在外面的节点直接跳过。
+        // 给一格留白避免靠边节点突然消失带来视觉跳变。
+        const vpLeft = -this.panX / this.zoom;
+        const vpTop = -this.panY / this.zoom;
+        const vpRight = vpLeft + this.canvas.width / this.zoom;
+        const vpBottom = vpTop + this.canvas.height / this.zoom;
+        const cullMargin = 8 / this.zoom;
+
         this.nodes.forEach(node => {
+            if (node.x + node.width < vpLeft - cullMargin
+                || node.x > vpRight + cullMargin
+                || node.y + node.height < vpTop - cullMargin
+                || node.y > vpBottom + cullMargin) {
+                return;
+            }
             if (useLOD && this.editingNode !== node) {
                 const thumb = this._getNodeThumbnail(node, isNightMode, normalColor, textColor);
                 this.ctx.drawImage(thumb, node.x, node.y, node.width, node.height);
@@ -9332,22 +9347,33 @@ class MindMapApp {
     // 主画布上直接 drawImage 缩放即可。视觉上跟原始 drawNode 一致（只是被浏览器线性插值缩小）。
     //
     // 失效 key 涵盖所有影响视觉的字段：尺寸 / 颜色 / 形状 / 字体 / 模式 / 对齐 / 文字色 /
-    // 夜间 / 选中 / 框选；以及 content 数组的"内容指纹"：
-    //   - 文本类 item 用 _wrapCache 引用（文本/字体/宽度变化会替换它，所以 ref 变化即内容变化）
-    //   - 图片 item 用 value + 显示尺寸 + 是否已加载（让加载完成时缩略图能重画一次）
-    // 选中态变化会导致 1–2 个节点的缩略图重画，但其它节点全部命中，开销很低。
+    // 夜间 / 选中 / 框选；以及 content 数组的"内容指纹"。指纹用扁平数组的 4 槽 / item：
+    //   [0] item ref（替换 / 增删被捕获）
+    //   [1] _wrapCache ref（文本/字体/宽度/code 参数变化即 ref 变化）
+    //   [2] image loaded 状态（加载完成时让缩略图重画一次）
+    //   [3] image displayWidth/Height 编码进单个数字
+    // 所有 slot 都是 O(1) 比较（引用 / 数字 / bool）。早先把 it.value（往往是几百 KB 的
+    // base64 data URL）拼进字符串再做 ===，会让每帧每个图节点跑一遍 megabyte 级 string
+    // compare，直接拖垮整个 LOD 路径。
     _getNodeThumbnail(node, isNightMode, normalColor, textColor) {
         const isSelected = this.selectedNode === node;
         const isFrameSelected = this.selectedNodes.includes(node);
 
-        const contentSig = (node.content || []).map(it => {
+        const items = node.content || [];
+        const sig = new Array(items.length * 4);
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            sig[i * 4] = it;
+            sig[i * 4 + 1] = it._wrapCache;
             if (it.type === 'image') {
                 const img = this.imageCache && this.imageCache.get(it.value);
-                const loaded = !!(img && img.complete && img.naturalWidth > 0);
-                return `img|${it.value}|${it.displayWidth}|${it.displayHeight}|${loaded ? 1 : 0}`;
+                sig[i * 4 + 2] = !!(img && img.complete && img.naturalWidth > 0);
+                sig[i * 4 + 3] = (it.displayWidth || 0) * 100000 + (it.displayHeight || 0);
+            } else {
+                sig[i * 4 + 2] = false;
+                sig[i * 4 + 3] = 0;
             }
-            return it._wrapCache;
-        });
+        }
 
         const cached = node._thumbnail;
         if (cached
@@ -9362,9 +9388,12 @@ class MindMapApp {
             && cached.nightMode === isNightMode
             && cached.selected === isSelected
             && cached.frameSelected === isFrameSelected
-            && cached.contentLen === contentSig.length
-            && cached.contentSig.every((v, i) => v === contentSig[i])) {
-            return cached.canvas;
+            && cached.sig.length === sig.length) {
+            let match = true;
+            for (let i = 0; i < sig.length; i++) {
+                if (cached.sig[i] !== sig[i]) { match = false; break; }
+            }
+            if (match) return cached.canvas;
         }
 
         const w = Math.max(1, Math.ceil(node.width));
@@ -9405,8 +9434,7 @@ class MindMapApp {
             nightMode: isNightMode,
             selected: isSelected,
             frameSelected: isFrameSelected,
-            contentLen: contentSig.length,
-            contentSig,
+            sig,
         };
         return canvas;
     }
