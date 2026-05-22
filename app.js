@@ -9406,6 +9406,10 @@ class MindMapApp {
             canvas.height = h;
         }
         const tctx = canvas.getContext('2d');
+        // 同一张离屏 canvas 可能被多次复用渲染（节点状态变化时重画）。
+        // getContext('2d') 每次返回同一个 context 实例，translate 会在已有变换上累积，
+        // 第二次渲染就会把节点画到画布外面去。务必先 setTransform 到单位矩阵再 translate。
+        tctx.setTransform(1, 0, 0, 1, 0, 0);
         tctx.clearRect(0, 0, w, h);
         // drawNode 的坐标都是 world 坐标 (node.x, node.y)。
         // 平移 -(node.x, node.y) 把节点对齐到缩略图的 (0, 0)。
