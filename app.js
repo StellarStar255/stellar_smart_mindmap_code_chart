@@ -2223,11 +2223,13 @@ class ShortcutManager {
         }
 
         this.bar.style.display = 'flex';
-        this.shortcuts.forEach((sc) => {
+        this.shortcuts.forEach((sc, idx) => {
             const pill = document.createElement('div');
             pill.className = 'shortcut-pill';
             pill.dataset.nodeId = sc.nodeId;
             pill.dataset.fileName = sc.fileName;
+            pill.dataset.idx = String(idx);
+            pill.draggable = true;
 
             const dot = document.createElement('div');
             dot.className = 'shortcut-dot';
@@ -2239,6 +2241,9 @@ class ShortcutManager {
             const remove = document.createElement('span');
             remove.className = 'shortcut-remove';
             remove.textContent = '×';
+            // × 自身不参与拖拽，免得用户想点删除时被识别成拖拽起点
+            remove.draggable = false;
+            remove.addEventListener('mousedown', (e) => e.stopPropagation());
 
             pill.appendChild(dot);
             pill.appendChild(text);
@@ -2257,6 +2262,70 @@ class ShortcutManager {
                 if (activeApp && activeApp.focusShortcut) {
                     activeApp.focusShortcut(sc);
                 }
+            });
+
+            // ===== 拖拽排序 =====
+            pill.addEventListener('dragstart', (e) => {
+                this._dragSourceIdx = idx;
+                pill.classList.add('dragging');
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Firefox 需要 setData 才会触发 drag
+                    e.dataTransfer.setData('text/plain', String(idx));
+                }
+            });
+
+            pill.addEventListener('dragend', () => {
+                pill.classList.remove('dragging');
+                this._dragSourceIdx = null;
+                this.pills.querySelectorAll('.shortcut-pill').forEach(p => {
+                    p.classList.remove('drag-over-before', 'drag-over-after');
+                });
+            });
+
+            pill.addEventListener('dragover', (e) => {
+                if (this._dragSourceIdx === null || this._dragSourceIdx === undefined) return;
+                e.preventDefault();
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+
+                // 根据指针在 pill 内部的相对位置判断插入到 target 之前还是之后；
+                // 水平方向看 x，垂直方向看 y
+                const rect = pill.getBoundingClientRect();
+                const isVertical = this.direction === 'vertical';
+                const insertBefore = isVertical
+                    ? (e.clientY - rect.top) < rect.height / 2
+                    : (e.clientX - rect.left) < rect.width / 2;
+
+                pill.classList.remove(insertBefore ? 'drag-over-after' : 'drag-over-before');
+                pill.classList.add(insertBefore ? 'drag-over-before' : 'drag-over-after');
+            });
+
+            pill.addEventListener('dragleave', (e) => {
+                // 只在指针真正离开 pill（而不是进了子元素）时清掉高亮
+                if (!pill.contains(e.relatedTarget)) {
+                    pill.classList.remove('drag-over-before', 'drag-over-after');
+                }
+            });
+
+            pill.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const srcIdx = this._dragSourceIdx;
+                pill.classList.remove('drag-over-before', 'drag-over-after');
+                if (srcIdx === null || srcIdx === undefined || srcIdx === idx) return;
+
+                const rect = pill.getBoundingClientRect();
+                const isVertical = this.direction === 'vertical';
+                const insertBefore = isVertical
+                    ? (e.clientY - rect.top) < rect.height / 2
+                    : (e.clientX - rect.left) < rect.width / 2;
+
+                let targetIdx = insertBefore ? idx : idx + 1;
+                // 从源位置移除后，目标位置如果在源之后要减 1，因为前面少了一项
+                const [item] = this.shortcuts.splice(srcIdx, 1);
+                if (targetIdx > srcIdx) targetIdx -= 1;
+                this.shortcuts.splice(targetIdx, 0, item);
+                this.save();
+                this.render();
             });
 
             this.pills.appendChild(pill);
