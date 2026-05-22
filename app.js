@@ -9005,14 +9005,16 @@ class MindMapApp {
             this.drawLine(connection.from, connection.to, connection, isNightMode);
         });
 
-        // 绘制节点 —— 全局视图 (zoom < LOD 阈值) 时切到缩略绘制，
-        // 跳过 fillText / token / 标签 / 控制点，只保留可识别的色块外形。
+        // 绘制节点 —— 全局视图 (zoom < LOD 阈值) 时用缓存的缩略图位图：
+        // 节点首次出现在缩略路径时离屏渲染一次，之后直接 drawImage 缩放，
+        // 视觉与原始 drawNode 一致，只是被浏览器双线性插值缩小。
         // 编辑中的节点强制走完整路径，避免编辑覆盖层错位。
         const LOD_ZOOM_THRESHOLD = 0.4;
         const useLOD = this.zoom < LOD_ZOOM_THRESHOLD;
         this.nodes.forEach(node => {
             if (useLOD && this.editingNode !== node) {
-                this.drawNodeSimplified(node, isNightMode, normalColor);
+                const thumb = this._getNodeThumbnail(node, isNightMode, normalColor, textColor);
+                this.ctx.drawImage(thumb, node.x, node.y, node.width, node.height);
             } else {
                 this.drawNode(node, isNightMode, normalColor, textColor);
             }
@@ -9326,45 +9328,87 @@ class MindMapApp {
         }
     }
 
-    // 低 zoom 时使用的"缩略"绘制：只画外形 + 填充 + 边框，跳过文本 / 标签 / 控制点。
-    // 文本在 zoom < 阈值时本来就接近不可读，跳过 fillText / token 渲染收益最大。
-    // 选中态依然反映（边框颜色），方便用户在全局视图中辨认选中节点。
-    drawNodeSimplified(node, isNightMode, normalColor) {
+    // 低 zoom 时使用的节点缩略图：把节点完整渲染到一张离屏 canvas，缓存在 node._thumbnail，
+    // 主画布上直接 drawImage 缩放即可。视觉上跟原始 drawNode 一致（只是被浏览器线性插值缩小）。
+    //
+    // 失效 key 涵盖所有影响视觉的字段：尺寸 / 颜色 / 形状 / 字体 / 模式 / 对齐 / 文字色 /
+    // 夜间 / 选中 / 框选；以及 content 数组的"内容指纹"：
+    //   - 文本类 item 用 _wrapCache 引用（文本/字体/宽度变化会替换它，所以 ref 变化即内容变化）
+    //   - 图片 item 用 value + 显示尺寸 + 是否已加载（让加载完成时缩略图能重画一次）
+    // 选中态变化会导致 1–2 个节点的缩略图重画，但其它节点全部命中，开销很低。
+    _getNodeThumbnail(node, isNightMode, normalColor, textColor) {
         const isSelected = this.selectedNode === node;
         const isFrameSelected = this.selectedNodes.includes(node);
-        const codeMode = !!node.codeMode;
 
-        const nodeColor = isNightMode ? toNightFillColor(node.color) : node.color;
+        const contentSig = (node.content || []).map(it => {
+            if (it.type === 'image') {
+                const img = this.imageCache && this.imageCache.get(it.value);
+                const loaded = !!(img && img.complete && img.naturalWidth > 0);
+                return `img|${it.value}|${it.displayWidth}|${it.displayHeight}|${loaded ? 1 : 0}`;
+            }
+            return it._wrapCache;
+        });
 
-        if (codeMode) {
-            // 跟 drawNode 保持一致的 code 背景判定
-            const hex = nodeColor.replace('#', '');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            const codeBg = luminance < 0.4 ? '#0f172a' : '#f6f8fa';
-            this.ctx.fillStyle = codeBg;
-            this.ctx.strokeStyle = codeBg;
-        } else {
-            this.ctx.fillStyle = nodeColor;
-            this.ctx.strokeStyle = normalColor;
+        const cached = node._thumbnail;
+        if (cached
+            && cached.w === node.width
+            && cached.h === node.height
+            && cached.color === node.color
+            && cached.shape === node.shape
+            && cached.fontSize === (node.fontSize || 13)
+            && cached.codeMode === !!node.codeMode
+            && cached.textAlign === node.textAlign
+            && cached.textColor === node.textColor
+            && cached.nightMode === isNightMode
+            && cached.selected === isSelected
+            && cached.frameSelected === isFrameSelected
+            && cached.contentLen === contentSig.length
+            && cached.contentSig.every((v, i) => v === contentSig[i])) {
+            return cached.canvas;
         }
 
-        if (isFrameSelected) {
-            this.ctx.strokeStyle = '#ff9800';
-            this.ctx.lineWidth = 3;
-        } else if (isSelected) {
-            this.ctx.strokeStyle = '#ff6b6b';
-            this.ctx.lineWidth = 3;
-        } else {
-            this.ctx.lineWidth = 2;
+        const w = Math.max(1, Math.ceil(node.width));
+        const h = Math.max(1, Math.ceil(node.height));
+
+        let canvas = cached && cached.canvas;
+        if (!canvas || canvas.width !== w || canvas.height !== h) {
+            canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+        }
+        const tctx = canvas.getContext('2d');
+        tctx.clearRect(0, 0, w, h);
+        // drawNode 的坐标都是 world 坐标 (node.x, node.y)。
+        // 平移 -(node.x, node.y) 把节点对齐到缩略图的 (0, 0)。
+        tctx.translate(-node.x, -node.y);
+
+        // 临时把 this.ctx 换成离屏 ctx：drawNode / drawNodeShape / drawNodeTag /
+        // _getWrappedItem 都从 this.ctx 取上下文，这样无需复制一份 drawNode。
+        const origCtx = this.ctx;
+        this.ctx = tctx;
+        try {
+            this.drawNode(node, isNightMode, normalColor, textColor);
+        } finally {
+            this.ctx = origCtx;
         }
 
-        const shape = node.shape || 'rounded-rect';
-        this.drawNodeShape(this.ctx, node, shape);
-        this.ctx.fill();
-        this.ctx.stroke();
+        node._thumbnail = {
+            canvas,
+            w: node.width,
+            h: node.height,
+            color: node.color,
+            shape: node.shape,
+            fontSize: node.fontSize || 13,
+            codeMode: !!node.codeMode,
+            textAlign: node.textAlign,
+            textColor: node.textColor,
+            nightMode: isNightMode,
+            selected: isSelected,
+            frameSelected: isFrameSelected,
+            contentLen: contentSig.length,
+            contentSig,
+        };
+        return canvas;
     }
 
     drawNode(node, isNightMode = null, normalColor = null, textColor = null) {
