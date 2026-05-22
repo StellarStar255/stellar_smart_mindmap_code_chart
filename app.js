@@ -1995,6 +1995,8 @@ class ShortcutManager {
         this.direction = 'horizontal'; // 'horizontal' or 'vertical'
         this.load();
         this.loadDirection();
+        this.applySize();
+        this.bindResizeHandle();
         this.bindEvents();
         this.render();
     }
@@ -2015,6 +2017,91 @@ class ShortcutManager {
         const ns = AppState.namespaceManager ? AppState.namespaceManager.getCurrentNamespace() : 'default';
         const file = encodeURIComponent(this.activeFile || 'default');
         return `mindmap_shortcut_dir_${ns}_${file}`;
+    }
+
+    getSizeKey() {
+        // 按方向 + 文件分开保存：横排和竖排理想尺寸差很多，分开记
+        const ns = AppState.namespaceManager ? AppState.namespaceManager.getCurrentNamespace() : 'default';
+        const file = encodeURIComponent(this.activeFile || 'default');
+        return `mindmap_shortcut_size_${this.direction}_${ns}_${file}`;
+    }
+
+    saveSize(size) {
+        try {
+            localStorage.setItem(this.getSizeKey(), JSON.stringify(size));
+        } catch (e) {
+            // localStorage 满 / 不可用就算了
+        }
+    }
+
+    loadSize() {
+        try {
+            const raw = localStorage.getItem(this.getSizeKey());
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    applySize() {
+        if (!this.bar) return;
+        const size = this.loadSize();
+        if (size && size.width) {
+            this.bar.style.width = `${size.width}px`;
+        } else {
+            this.bar.style.width = '';
+        }
+        if (size && size.height) {
+            this.bar.style.height = `${size.height}px`;
+        } else {
+            this.bar.style.height = '';
+        }
+    }
+
+    // 自定义右下角拖拽 resize：原生 CSS resize 在暗色背景下手柄几乎看不见，
+    // 自己挂一个 16x16 的视觉手柄 + pointer 事件，更直观也更可控。
+    bindResizeHandle() {
+        const handle = document.getElementById('shortcutResizeHandle');
+        if (!handle || !this.bar) return;
+        if (this._resizeHandleBound) return;
+        this._resizeHandleBound = true;
+
+        let startX = 0, startY = 0, startW = 0, startH = 0;
+
+        const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            // 与 CSS 中的 min 保持一致；max 让 CSS max-height: 90vh 自己 clamp
+            const w = Math.max(200, startW + dx);
+            const h = Math.max(80, startH + dy);
+            this.bar.style.width = `${w}px`;
+            this.bar.style.height = `${h}px`;
+        };
+
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            document.body.style.userSelect = '';
+            // 拖动结束时落盘一次
+            this.saveSize({
+                width: Math.round(this.bar.offsetWidth),
+                height: Math.round(this.bar.offsetHeight),
+            });
+        };
+
+        handle.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = this.bar.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            startW = rect.width;
+            startH = rect.height;
+            // 防止拖动过程中误选中文本
+            document.body.style.userSelect = 'none';
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
     }
 
     load() {
@@ -2049,6 +2136,8 @@ class ShortcutManager {
         this.direction = this.direction === 'horizontal' ? 'vertical' : 'horizontal';
         this.saveDirection();
         this.applyDirection();
+        // 横/竖排各自记一份尺寸，切换时把对应的尺寸应用上去
+        this.applySize();
         // 切换方向后重新应用位置，确保在视口内
         this.applyPosition(false);
     }
@@ -2067,6 +2156,7 @@ class ShortcutManager {
     reloadForNamespace() {
         this.load();
         this.loadDirection();
+        this.applySize();
         this.applyPosition(false);
         this.render();
     }
@@ -2077,6 +2167,7 @@ class ShortcutManager {
         this.activeFile = name;
         this.load();
         this.loadDirection();
+        this.applySize();
         this.applyPosition(false);
         this.render();
     }
