@@ -9406,41 +9406,32 @@ class MindMapApp {
                 totalContentHeight += displayHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'text') {
-                this.ctx.font = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
                 const wrapMaxWidth = node.width - paddingX * 2;
-                // code 模式下使用 token-aware 软换行的视觉行数，与渲染路径保持一致
-                let lineCount;
-                if (codeMode) {
-                    const normalized = String(item.value || '').replace(/\t/g, '    ');
-                    lineCount = 0;
-                    normalized.split(/\r?\n/).forEach(p => {
-                        lineCount += this._wrapCodeLine(p, wrapMaxWidth, this.ctx).length;
-                    });
-                } else {
-                    lineCount = this.wrapText(item.value, wrapMaxWidth, this.ctx).length;
-                }
-                totalContentHeight += lineCount * lineHeight;
+                const textFont = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
+                const codeOpts = codeMode
+                    ? { language: resolvedLanguage, color: codeTextColor, bg: codeBg, isNightMode }
+                    : null;
+                const { lines } = this._getWrappedItem(item, this.ctx, textFont, item.value, wrapMaxWidth, codeOpts);
+                totalContentHeight += lines.length * lineHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'link') {
-                // 链接类型：显示标题（粗体）和URL（小号）
-                // 设置粗体字体来计算标题行数，确保和实际绘制一致
-                this.ctx.font = `bold ${fontSize}px sans-serif`;
-                const titleLines = this.wrapText(item.title || item.url, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
-                this.ctx.font = `${fontSize}px sans-serif`; // 恢复常规字体
+                // 链接类型：标题（粗体）+ URL（小号，单行）
+                const titleText = item.title || item.url;
+                const titleFont = `bold ${fontSize}px sans-serif`;
+                const { lines: titleLines } = this._getWrappedItem(item, this.ctx, titleFont, titleText, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 totalContentHeight += titleLines.length * lineHeight;
-                // URL文本稍小一些
                 totalContentHeight += lineHeight * 0.8;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'pending_link') {
-                // 待处理的链接，暂时显示为文本
-                const lines = this.wrapText(item.value || item.url, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
+                const pendingFont = `${fontSize}px sans-serif`;
+                const { lines } = this._getWrappedItem(item, this.ctx, pendingFont, item.value || item.url, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 totalContentHeight += lines.length * lineHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             } else if (item.type === 'pageLink') {
-                // 页面链接类型：显示链接图标和页面名称
                 const displayText = item.label || `→ ${item.value}`;
-                const lines = this.wrapText(displayText, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
+                const pageLinkFont = `bold ${fontSize}px sans-serif`;
+                const { lines } = this._getWrappedItem(item, this.ctx, pageLinkFont, displayText, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 totalContentHeight += lines.length * lineHeight;
                 if (index > 0) totalContentHeight += this.IMAGE_TEXT_GAP;
             }
@@ -9519,21 +9510,17 @@ class MindMapApp {
                                 }            } else if (item.type === 'text') {
                 // 绘制文本
                 this.ctx.fillStyle = codeMode ? codeTextColor : baseTextColor;
-                this.ctx.font = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
                 this.ctx.textAlign = textAlign;
                 this.ctx.textBaseline = 'top';
 
                 const paddingX = codeMode && textAlign === 'left' ? this.NODE_HORIZONTAL_PADDING : this.NODE_HORIZONTAL_PADDING / 2;
                 const wrapMaxWidth = node.width - paddingX * 2;
-                // code 模式下使用 token-aware 软换行：先对整段 tokenize，再按字符区间切到视觉行，
-                // 这样字符串/注释跨视觉行也能保持高亮。非 code 模式走原来的 wrapText。
-                const codeLines = codeMode
-                    ? this._buildCodeLines(item.value, wrapMaxWidth, this.ctx, resolvedLanguage, codeTextColor, codeBg, isNightMode)
+                const textFont = `${fontSize}px ${codeMode ? codeFontStack : fontFamily}`;
+                const codeOpts = codeMode
+                    ? { language: resolvedLanguage, color: codeTextColor, bg: codeBg, isNightMode }
                     : null;
-                const lines = codeMode
-                    ? codeLines.map(l => l.text)
-                    : this.wrapText(item.value, wrapMaxWidth, this.ctx);
-                const maxLineWidth = lines.reduce((max, line) => Math.max(max, this.ctx.measureText(line).width), 0);
+                // 缓存命中时 _getWrappedItem 会替我们 set ctx.font，无需手动再设
+                const { lines, codeLines, maxLineWidth } = this._getWrappedItem(item, this.ctx, textFont, item.value, wrapMaxWidth, codeOpts);
                 const bgPaddingX = 8;
                 const bgPaddingY = 6;
 
@@ -9588,8 +9575,8 @@ class MindMapApp {
 
                 // 绘制标题（粗体）
                 this.ctx.fillStyle = baseTextColor;
-                this.ctx.font = `bold ${fontSize}px sans-serif`;
-                const titleLines = this.wrapText(item.title || item.url, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
+                const titleFont = `bold ${fontSize}px sans-serif`;
+                const { lines: titleLines } = this._getWrappedItem(item, this.ctx, titleFont, item.title || item.url, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 titleLines.forEach(line => {
                     let textX;
                     if (textAlign === 'left') {
@@ -9633,11 +9620,11 @@ class MindMapApp {
             } else if (item.type === 'pending_link') {
                 // 待处理的链接，暂时显示为普通文本
                 this.ctx.fillStyle = baseTextColor;
-                this.ctx.font = `${fontSize}px sans-serif`;
                 this.ctx.textAlign = textAlign;
                 this.ctx.textBaseline = 'top';
 
-                const lines = this.wrapText(item.value || item.url, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
+                const pendingFont = `${fontSize}px sans-serif`;
+                const { lines } = this._getWrappedItem(item, this.ctx, pendingFont, item.value || item.url, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 lines.forEach(line => {
                     let textX;
                     if (textAlign === 'left') {
@@ -9654,12 +9641,12 @@ class MindMapApp {
                 // 页面链接类型：显示链接图标和页面名称
                 const pageLinkColor = isNightMode ? '#38bdf8' : '#0284c7';
                 this.ctx.fillStyle = pageLinkColor;
-                this.ctx.font = `bold ${fontSize}px sans-serif`;
                 this.ctx.textAlign = textAlign;
                 this.ctx.textBaseline = 'top';
 
                 const displayText = item.label || `→ ${item.value}`;
-                const lines = this.wrapText(displayText, node.width - this.NODE_HORIZONTAL_PADDING, this.ctx);
+                const pageLinkFont = `bold ${fontSize}px sans-serif`;
+                const { lines } = this._getWrappedItem(item, this.ctx, pageLinkFont, displayText, node.width - this.NODE_HORIZONTAL_PADDING, null);
                 lines.forEach(line => {
                     let textX;
                     if (textAlign === 'left') {
@@ -9758,6 +9745,47 @@ class MindMapApp {
             this.ctx.fillStyle = 'rgba(102, 126, 234, 0.3)';
             this.ctx.fillRect(selMinX, selMinY, selMaxX - selMinX, selMaxY - selMinY);
         }
+    }
+
+    // 在 item 上缓存换行后的视觉行 / 最长行宽 / code 模式的 token 切片。
+    // drawNode 每帧会先做"算高度"再做"实际绘制"两次遍历，原本每次都跑一遍 wrapText
+    // + measureText(N 行)；缓存后同一帧内两次遍历只算一次，并且节点内容/字体/宽度
+    // 不变时跨帧也能直接命中（pan / zoom 几乎为零成本）。
+    _getWrappedItem(item, ctx, font, text, maxWidth, codeOpts) {
+        const c = item._wrapCache;
+        const codeKey = codeOpts
+            ? `${codeOpts.language}|${codeOpts.color}|${codeOpts.bg}|${codeOpts.isNightMode ? 1 : 0}`
+            : '';
+
+        if (c
+            && c.text === text
+            && c.font === font
+            && c.maxWidth === maxWidth
+            && c.codeKey === codeKey) {
+            // 命中：ctx.font 必须保证一致，让调用方紧接着用 fillText 时拿到正确字体
+            ctx.font = font;
+            return c.result;
+        }
+
+        ctx.font = font;
+        let lines;
+        let codeLines = null;
+        if (codeOpts) {
+            codeLines = this._buildCodeLines(text, maxWidth, ctx, codeOpts.language, codeOpts.color, codeOpts.bg, codeOpts.isNightMode);
+            lines = codeLines.map(l => l.text);
+        } else {
+            lines = this.wrapText(text, maxWidth, ctx);
+        }
+
+        let maxLineWidth = 0;
+        for (let i = 0; i < lines.length; i++) {
+            const w = ctx.measureText(lines[i]).width;
+            if (w > maxLineWidth) maxLineWidth = w;
+        }
+
+        const result = { lines, codeLines, maxLineWidth };
+        item._wrapCache = { text, font, maxWidth, codeKey, result };
+        return result;
     }
 
     wrapText(text, maxWidth, ctx) {
