@@ -1984,10 +1984,6 @@ class ShortcutManager {
         this.bar = document.getElementById('shortcutBar');
         this.pills = document.getElementById('shortcutPills');
         this.directionBtn = document.getElementById('shortcutDirectionBtn');
-        this.manageBtn = document.getElementById('shortcutManageBtn');
-        this.managePanel = document.getElementById('shortcutManagePanel');
-        this.manageList = document.getElementById('shortcutManageList');
-        this.manageClose = document.getElementById('shortcutManageClose');
         this.dragging = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
@@ -2189,32 +2185,10 @@ class ShortcutManager {
         this.render();
     }
 
-    moveShortcut(index, direction) {
-        const newIndex = index + direction;
-        if (newIndex < 0 || newIndex >= this.shortcuts.length) return;
-        const [item] = this.shortcuts.splice(index, 1);
-        this.shortcuts.splice(newIndex, 0, item);
-        this.save();
-        this.render();
-    }
-
     bindEvents() {
         if (this.directionBtn) {
             this.directionBtn.addEventListener('click', () => {
                 this.toggleDirection();
-            });
-        }
-        if (this.manageBtn) {
-            this.manageBtn.addEventListener('click', () => {
-                if (this.managePanel) {
-                    this.managePanel.style.display = this.managePanel.style.display === 'block' ? 'none' : 'block';
-                    this.renderManageList();
-                }
-            });
-        }
-        if (this.manageClose) {
-            this.manageClose.addEventListener('click', () => {
-                if (this.managePanel) this.managePanel.style.display = 'none';
             });
         }
 
@@ -2309,7 +2283,6 @@ class ShortcutManager {
         this.pills.innerHTML = '';
         if (this.shortcuts.length === 0) {
             this.bar.style.display = 'none';
-            if (this.managePanel) this.managePanel.style.display = 'none';
             return;
         }
 
@@ -2422,43 +2395,7 @@ class ShortcutManager {
             this.pills.appendChild(pill);
         });
 
-        this.renderManageList();
         this.applyPosition();
-    }
-
-    renderManageList() {
-        if (!this.manageList) return;
-        this.manageList.innerHTML = '';
-        this.shortcuts.forEach((sc, idx) => {
-            const row = document.createElement('div');
-            row.className = 'shortcut-manage-item';
-            row.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="shortcut-dot" style="background:${sc.color || '#667eea'}"></div>
-                    <div style="font-size:13px; line-height:1.3;">
-                        <div>${sc.label || '快捷节点'}</div>
-                        <div style="opacity:0.6; font-size:11px;">${sc.fileName || ''}</div>
-                    </div>
-                </div>
-                <div class="shortcut-manage-actions">
-                    <button class="move" data-dir="-1">↑</button>
-                    <button class="move" data-dir="1">↓</button>
-                    <button class="delete">删除</button>
-                </div>
-            `;
-            row.querySelectorAll('button.move').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const dir = parseInt(btn.getAttribute('data-dir'), 10);
-                    this.moveShortcut(idx, dir);
-                });
-            });
-            row.querySelector('button.delete').addEventListener('click', () => {
-                const activeApp = AppState.activeScreen === 'left' ? AppState.appLeft : AppState.appRight;
-                if (activeApp) activeApp.removeShortcutById(sc.nodeId, sc.fileName);
-                this.removeShortcut(sc.nodeId, sc.fileName);
-            });
-            this.manageList.appendChild(row);
-        });
     }
 }
 

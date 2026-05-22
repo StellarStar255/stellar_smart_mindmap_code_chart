@@ -409,7 +409,6 @@
         }
 
         body.encrypted-locked .shortcut-bar,
-        body.encrypted-locked .shortcut-manage-panel,
         body.encrypted-locked .context-menu,
         body.encrypted-locked .image-context-menu {
             display: none !important;
@@ -591,75 +590,6 @@
 
         .shortcut-manage-btn:hover {
             filter: brightness(1.05);
-        }
-
-        .shortcut-manage-panel {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.98);
-            color: #e2e8f0;
-            border-radius: 16px;
-            padding: 14px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-            z-index: 12000;
-            width: 360px;
-            max-width: 90vw;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            display: none;
-        }
-
-        .shortcut-manage-panel header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .shortcut-manage-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 320px;
-            overflow-y: auto;
-        }
-
-        .shortcut-manage-item {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .shortcut-manage-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .shortcut-manage-actions button {
-            padding: 4px 8px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .shortcut-manage-actions button.move {
-            background: rgba(148, 163, 184, 0.2);
-            color: #e2e8f0;
-        }
-
-        .shortcut-manage-actions button.delete {
-            background: rgba(248, 113, 113, 0.2);
-            color: #fecdd3;
         }
 
         #fileManagerList {
@@ -2810,16 +2740,8 @@
         <div class="shortcut-pills" id="shortcutPills"></div>
         <div class="shortcut-buttons">
             <button class="shortcut-manage-btn" id="shortcutDirectionBtn" title="切换方向">⇄</button>
-            <button class="shortcut-manage-btn" id="shortcutManageBtn">管理</button>
         </div>
         <div class="shortcut-resize-handle" id="shortcutResizeHandle" title="拖动右下角调整大小"></div>
-    </div>
-    <div id="shortcutManagePanel" class="shortcut-manage-panel">
-        <header>
-            <span>快捷方式管理</span>
-            <button id="shortcutManageClose" class="shortcut-manage-btn" style="padding:4px 8px;">关闭</button>
-        </header>
-        <div class="shortcut-manage-list" id="shortcutManageList"></div>
     </div>
     <script src="storage-adapter.js"></script>
     <script src="assets/crypto-js.js"></script>
