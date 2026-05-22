@@ -9005,9 +9005,17 @@ class MindMapApp {
             this.drawLine(connection.from, connection.to, connection, isNightMode);
         });
 
-        // 绘制节点
+        // 绘制节点 —— 全局视图 (zoom < LOD 阈值) 时切到缩略绘制，
+        // 跳过 fillText / token / 标签 / 控制点，只保留可识别的色块外形。
+        // 编辑中的节点强制走完整路径，避免编辑覆盖层错位。
+        const LOD_ZOOM_THRESHOLD = 0.4;
+        const useLOD = this.zoom < LOD_ZOOM_THRESHOLD;
         this.nodes.forEach(node => {
-            this.drawNode(node, isNightMode, normalColor, textColor);
+            if (useLOD && this.editingNode !== node) {
+                this.drawNodeSimplified(node, isNightMode, normalColor);
+            } else {
+                this.drawNode(node, isNightMode, normalColor, textColor);
+            }
         });
 
         // 绘制选中连接线的控制点
@@ -9316,6 +9324,47 @@ class MindMapApp {
                 ctx.roundRect(x, y, width, height, 8);
                 break;
         }
+    }
+
+    // 低 zoom 时使用的"缩略"绘制：只画外形 + 填充 + 边框，跳过文本 / 标签 / 控制点。
+    // 文本在 zoom < 阈值时本来就接近不可读，跳过 fillText / token 渲染收益最大。
+    // 选中态依然反映（边框颜色），方便用户在全局视图中辨认选中节点。
+    drawNodeSimplified(node, isNightMode, normalColor) {
+        const isSelected = this.selectedNode === node;
+        const isFrameSelected = this.selectedNodes.includes(node);
+        const codeMode = !!node.codeMode;
+
+        const nodeColor = isNightMode ? toNightFillColor(node.color) : node.color;
+
+        if (codeMode) {
+            // 跟 drawNode 保持一致的 code 背景判定
+            const hex = nodeColor.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            const codeBg = luminance < 0.4 ? '#0f172a' : '#f6f8fa';
+            this.ctx.fillStyle = codeBg;
+            this.ctx.strokeStyle = codeBg;
+        } else {
+            this.ctx.fillStyle = nodeColor;
+            this.ctx.strokeStyle = normalColor;
+        }
+
+        if (isFrameSelected) {
+            this.ctx.strokeStyle = '#ff9800';
+            this.ctx.lineWidth = 3;
+        } else if (isSelected) {
+            this.ctx.strokeStyle = '#ff6b6b';
+            this.ctx.lineWidth = 3;
+        } else {
+            this.ctx.lineWidth = 2;
+        }
+
+        const shape = node.shape || 'rounded-rect';
+        this.drawNodeShape(this.ctx, node, shape);
+        this.ctx.fill();
+        this.ctx.stroke();
     }
 
     drawNode(node, isNightMode = null, normalColor = null, textColor = null) {
