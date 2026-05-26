@@ -2426,8 +2426,8 @@ class ModeController {
     }
 
     loadFullscreenViewState() {
-        const saved = localStorage.getItem(this.storageKeyFullscreenView);
-        return saved === 'true';
+        // 演示窗口为永久默认样式，始终启用
+        return true;
     }
 
     loadSidebarHiddenState() {
@@ -2638,7 +2638,6 @@ class ModeController {
     applyFullscreenViewState() {
         const container = document.querySelector('.container');
         const mainContent = document.querySelector('.main-content');
-        const fullscreenViewBtn = document.getElementById('fullscreenViewBtn');
         const body = document.body;
         const statusBar = document.querySelector('.status-bar');
         const header = document.querySelector('.header');
@@ -2647,7 +2646,6 @@ class ModeController {
             container.classList.add('fullscreen-view-mode');
             mainContent.classList.add('fullscreen-view');
             body.classList.add('fullscreen-view-active');
-            fullscreenViewBtn.textContent = '🖥 退出演示';
 
             // 强制显示 header 和 status-bar
             if (header) {
@@ -2662,7 +2660,6 @@ class ModeController {
             container.classList.remove('fullscreen-view-mode');
             mainContent.classList.remove('fullscreen-view');
             body.classList.remove('fullscreen-view-active');
-            fullscreenViewBtn.textContent = '🖥 演示';
 
             // 恢复默认样式
             if (header) {
@@ -4443,14 +4440,6 @@ class MindMapApp {
 
             // 初始加载文件列表
             this.updateSidebarFileList();
-
-            // 全屏显示按钮 - 全局（通过ModeController处理，保存状态）
-            const fullscreenViewBtn = document.getElementById('fullscreenViewBtn');
-            if (fullscreenViewBtn) {
-                fullscreenViewBtn.addEventListener('click', () => {
-                    modeController.toggleFullscreenView();
-                });
-            }
 
             // 键盘事件 - 全局
             document.addEventListener('keydown', (e) => {
